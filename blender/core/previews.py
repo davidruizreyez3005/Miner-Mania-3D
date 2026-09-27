@@ -55,7 +55,12 @@ def render_glb(glb_path, out_path, cfg, frame_action=None, frame=0):
         arm.animation_data_create()
         arm.animation_data.action = bpy.data.actions[frame_action]
         sc.frame_set(frame)
-    meshes = [o for o in objs if o.type == "MESH" and not o.name.endswith("-convcolonly")]
+    # Only visible render meshes (the glTF importer adds a hidden bone-shape sphere).
+    meshes = [o for o in objs if o.type == "MESH" and not o.name.endswith("-convcolonly") and o.visible_get()
+              and not o.hide_render and o.users_collection and len(o.data.polygons) > 0]
+    for o in objs:
+        if o.type == "MESH" and o not in meshes:
+            o.hide_render = True
     deps = bpy.context.evaluated_depsgraph_get()
     lo = Vector((1e9, 1e9, 1e9))
     hi = Vector((-1e9, -1e9, -1e9))

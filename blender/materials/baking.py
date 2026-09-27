@@ -97,11 +97,17 @@ def _restore_bsdf(mat, em):
     nt.nodes.remove(em)
 
 
+BAKE_TIMINGS = {}
+
+
 def _bake(kind, margin, samples, **kw):
+    import time
     scene = bpy.context.scene
     scene.cycles.samples = samples
+    t = time.time()
     r = bpy.ops.object.bake(type=kind, margin=margin, margin_type="EXTEND", use_clear=True,
                             target="IMAGE_TEXTURES", use_selected_to_active=False, **kw)
+    BAKE_TIMINGS[kind] = round(BAKE_TIMINGS.get(kind, 0.0) + time.time() - t, 2)
     if "FINISHED" not in r:
         raise PipelineError(f"Cycles bake pass {kind} failed: {r}")
 
@@ -169,6 +175,32 @@ def build_final_material(name, base_path, orm_path, normal_path):
     return mat
 
 
+def _joined_proxy(objs):
+    """Temporary single-object copy of all parts sharing the atlas.
+
+    Cycles bakes every selected object as a separate full-image pass, so a
+    21-part character took ~8 s per pass; one joined proxy takes ~0.4 s.
+    Modifiers are dropped (rest pose) and transforms baked in.
+    """
+    dups = []
+    for o in objs:
+        d = o.copy()
+        d.data = o.data.copy()
+        d.modifiers.clear()
+        d.parent = None
+        d.matrix_world = o.matrix_world.copy()
+        scn.link(d)
+        dups.append(d)
+    if len(dups) > 1:
+        scn.select_only(dups, dups[0])
+        r = bpy.ops.object.join()
+        if "FINISHED" not in r:
+            raise PipelineError(f"could not join bake proxy: {r}")
+    proxy = dups[0]
+    proxy.name = "__bake_proxy__"
+    return proxy
+
+
 def bake_asset(objs, size, stem, work_dir, cfg, ao_distance):
     """Bake all baked-library materials on ``objs`` and return texture info."""
     tcfg = cfg["textures"]
@@ -176,7 +208,25 @@ def bake_asset(objs, size, stem, work_dir, cfg, ao_distance):
     mats = _materials(objs)
     if not mats:
         raise PipelineError(f"{stem}: no bakeable materials on {[o.name for o in objs]}")
-    scn.select_only(objs, objs[0])
+    proxy = _joined_proxy(objs)
+    # The originals must not be renderable while the coincident proxy bakes,
+    # otherwise AO rays start inside duplicate surfaces (black, slow AO).
+    hidden = [(o, o.hide_render) for o in objs]
+    for o, _ in hidden:
+        o.hide_render = True
+    try:
+        return _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance)
+    finally:
+        for o, state in hidden:
+            o.hide_render = state
+        mesh = proxy.data
+        bpy.data.objects.remove(proxy, do_unlink=True)
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
+
+
+def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
+    scn.select_only([proxy], proxy)
     scene = bpy.context.scene
     scene.world.light_settings.distance = ao_distance
 
@@ -186,8 +236,20 @@ def bake_asset(objs, size, stem, work_dir, cfg, ao_distance):
     img_rgh = _new_image(f"{stem}_rough", size, True)
     img_met = _new_image(f"{stem}_metal", size, True)
 
-    _set_target(mats, img_ao)
-    _bake("AO", margin, int(tcfg["ao_samples"]))
+    # AO only needs geometry: bake it with one flat material on the proxy so the
+    # procedural bump networks are not evaluated for every AO sample (~6x faster).
+    flat = bpy.data.materials.new("__ao_flat__")
+    flat.use_nodes = True
+    _set_target([flat], img_ao)
+    saved = list(proxy.data.materials)
+    for i in range(len(saved)):
+        proxy.data.materials[i] = flat
+    try:
+        _bake("AO", margin, int(tcfg["ao_samples"]))
+    finally:
+        for i, m in enumerate(saved):
+            proxy.data.materials[i] = m
+        bpy.data.materials.remove(flat)
     for m in mats:
         n = m.node_tree.nodes.get(AO_NODE)
         if n is not None:

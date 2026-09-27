@@ -155,20 +155,33 @@ def _split_non_baked(parts):
 
 def stage_optimize(ctx):
     from materials import baking, uv
+    t0 = time.time()
     parts = [o for o in ctx.objects if o.type == "MESH"]
     _clean_parts(parts)
     parts = _split_non_baked(parts)
+    t_clean = time.time() - t0
     baked = [o for o in parts if any(s.material is not None and s.material.get("mm_baked", True)
                                       for s in o.material_slots)]
     if not baked:
         raise PipelineError("asset has no bakeable (textured) surfaces")
     angle = 60.0 if ctx.character is not None else 52.0
-    uv.unwrap_atlas(baked, margin=ctx.cfg["uv"]["island_margin"], angle_limit_deg=angle)
+    pad_px = int(ctx.cfg["textures"]["bake_margin_px"].get(str(ctx.texture_size), 8))
+    # Island gap of ~half the bake padding: bleeding stays inside each island's
+    # own dilation while small detail islands waste less atlas space.
+    margin = max(ctx.cfg["uv"]["island_margin"], 0.5 * pad_px / float(ctx.texture_size))
+    t1 = time.time()
+    uv.unwrap_atlas(baked, margin=margin, angle_limit_deg=angle)
+    t_uv = time.time() - t1
     ctx.uv_stats = uv.uv_stats(baked, ctx.texture_size)
+    t_stats = time.time() - t1 - t_uv
     lo, hi = scn.world_bounds(parts)
     size = max(hi[i] - lo[i] for i in range(3))
     ao_dist = max(0.06, min(1.2, 0.12 * size)) if ctx.character is None else 0.2
+    t2 = time.time()
+    baking.BAKE_TIMINGS.clear()
     tex_paths, stats = baking.bake_asset(baked, ctx.texture_size, ctx.name, ctx.work_dir, ctx.cfg, ao_dist)
+    log.info(f"optimize timings: clean {t_clean:.1f}s uv {t_uv:.1f}s uv_stats {t_stats:.1f}s "
+             f"bake {time.time() - t2:.1f}s {dict(baking.BAKE_TIMINGS)}")
     ctx.texture_paths = tex_paths
     mat = baking.build_final_material(f"M_{ctx.name}", tex_paths["base_color"], tex_paths["orm"], tex_paths["normal"])
     baking.replace_with_baked(baked, mat)

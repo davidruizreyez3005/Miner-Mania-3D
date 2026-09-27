@@ -22,11 +22,27 @@ def ensure_uv_layer(obj):
     me.uv_layers[UV_NAME].active_render = True
 
 
-def unwrap_atlas(objs, margin=0.004, angle_limit_deg=52.0, shape_method="CONCAVE"):
-    """Smart-project + average scale + pack all objects into one 0..1 atlas.
+def _scale_object_uvs(obj, factor):
+    import numpy as np
+    uvl = obj.data.uv_layers[UV_NAME].data
+    n = len(uvl)
+    if not n or abs(factor - 1.0) < 1e-6:
+        return
+    arr = np.empty(n * 2, dtype=np.float64)
+    uvl.foreach_get("uv", arr)
+    arr = arr.reshape(n, 2)
+    c = arr.mean(axis=0)
+    arr = c + (arr - c) * factor
+    uvl.foreach_set("uv", arr.ravel())
 
-    Note: the FRACTION margin method runs an iterative scale search that is
-    orders of magnitude slower (37 s vs 2 s on a barrel); SCALED is used.
+
+def unwrap_atlas(objs, margin=0.004, angle_limit_deg=52.0, shape_method="CONCAVE"):
+    """Smart-project + average scale + priority scaling + pack into one 0..1 atlas.
+
+    Objects may carry ``mm_uv_scale`` (e.g. 1.8 for faces) to receive more
+    texel density than the uniform average. Note: the FRACTION margin method
+    runs an iterative scale search that is orders of magnitude slower (37 s vs
+    2 s on a barrel); ADD is used with a margin derived from the bake padding.
     """
     objs = [o for o in objs if o.type == "MESH" and len(o.data.polygons)]
     if not objs:
@@ -41,7 +57,14 @@ def unwrap_atlas(objs, margin=0.004, angle_limit_deg=52.0, shape_method="CONCAVE
             raise PipelineError(f"smart_project failed: {r}")
         bpy.ops.uv.select_all(action="SELECT")
         bpy.ops.uv.average_islands_scale()
-        r = bpy.ops.uv.pack_islands(rotate=True, rotate_method="ANY", scale=True, margin_method="SCALED",
+    for o in objs:
+        _scale_object_uvs(o, float(o.get("mm_uv_scale", 1.0)))
+    with scn.edit_mode(objs):
+        bpy.ops.uv.select_all(action="SELECT")
+        # ADD keeps a constant UV-space gap between islands; SCALED shrinks the
+        # gap for small islands, which lets neighbouring islands bleed into each
+        # other under texture filtering.
+        r = bpy.ops.uv.pack_islands(rotate=True, rotate_method="ANY", scale=True, margin_method="ADD",
                                     margin=margin, shape_method=shape_method)
         if "FINISHED" not in r:
             raise PipelineError(f"pack_islands failed: {r}")

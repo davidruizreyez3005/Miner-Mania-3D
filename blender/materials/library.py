@@ -290,18 +290,50 @@ def build_leather(nb, col):
 
 
 def build_skin(nb, col):
+    """Body skin (hands, forearms). Pattern coordinates are world-space."""
     base = color(col)
-    blush = _tint(base, (0.75, 0.25, 0.22), 0.18)
+    n = nb.noise(nb.coord(9.0), detail=3.0)
+    col_out = nb.mix(nb.map_range(n, 0.3, 0.7, 0.0, 1.0), _lin(base, 0.95), _lin(base, 1.04))
+    ao = nb.ao_mask()
+    col_out = nb.mix(nb.map_range(ao, 0.4, 0.95, 0.6, 0.0), col_out, _tint(_lin(base, 0.6), (0.5, 0.2, 0.2), 0.2))
+    pores = nb.noise(nb.coord(400.0), detail=1.0)
+    nb.surface(col_out, nb.map_range(n, 0.3, 0.7, 0.5, 0.62), 0.0, nb.bump(pores, 0.03, 0.002))
+
+
+def build_face(nb, col):
+    """Head skin with painted features in head-local coordinates (origin at the
+    face center, -Y forward): warm cheeks/nose, lips and a soft mouth line."""
+    base = color(col)
     x, y, z = nb.sep(nb.coord())
     n = nb.noise(nb.coord(9.0), detail=3.0)
     col_out = nb.mix(nb.map_range(n, 0.3, 0.7, 0.0, 1.0), _lin(base, 0.95), _lin(base, 1.04))
-    # Warmer tone toward the front of the face (nose / cheeks) using head-local coordinates.
-    front = nb.map_range(y, -0.02, -0.1, 0.0, 0.55, smooth=True)
-    col_out = nb.mix(front, col_out, blush)
-    pores = nb.noise(nb.coord(400.0), detail=1.0)
+    front = nb.map_range(y, -0.03, -0.1, 0.0, 1.0, smooth=True)
+    blush = _tint(base, (0.8, 0.3, 0.26), 0.16)
+    col_out = nb.mix(nb.math("MULTIPLY", front, 0.6), col_out, blush)
+
+    def ellipse(cx, cz, rx, rz):
+        dx = nb.math("DIVIDE", nb.math("SUBTRACT", x, cx), rx)
+        dz = nb.math("DIVIDE", nb.math("SUBTRACT", z, cz), rz)
+        d2 = nb.math("ADD", nb.math("MULTIPLY", dx, dx), nb.math("MULTIPLY", dz, dz))
+        return nb.math("MULTIPLY", nb.math("EXPONENT", nb.math("MULTIPLY", d2, -1.0)), front)
+
+    lips = ellipse(0.0, -0.066, 0.021, 0.0085)
+    lip_col = _tint(_lin(base, 0.86), (0.62, 0.22, 0.22), 0.3)
+    col_out = nb.mix(nb.map_range(lips, 0.25, 0.6, 0.0, 1.0), col_out, lip_col)
+    line = ellipse(0.0, -0.0655, 0.018, 0.0016)
+    col_out = nb.mix(nb.map_range(line, 0.3, 0.8, 0.0, 0.85), col_out, _lin(lip_col, 0.35))
     ao = nb.ao_mask()
     col_out = nb.mix(nb.map_range(ao, 0.4, 0.95, 0.6, 0.0), col_out, _tint(_lin(base, 0.6), (0.5, 0.2, 0.2), 0.2))
-    nb.surface(col_out, nb.map_range(n, 0.3, 0.7, 0.48, 0.6), 0.0, nb.bump(pores, 0.03, 0.002))
+    pores = nb.noise(nb.coord(400.0), detail=1.0)
+    rough = nb.mixf(nb.map_range(lips, 0.3, 0.7, 0.0, 1.0), nb.map_range(n, 0.3, 0.7, 0.48, 0.6), 0.36)
+    nb.surface(col_out, rough, 0.0, nb.bump(pores, 0.03, 0.002))
+
+
+def build_lips(nb, col):
+    base = _tint(_lin(color(col), 0.85), (0.6, 0.2, 0.2), 0.3)
+    n = nb.noise(nb.coord(60.0), detail=2.0)
+    col_out = nb.mix(nb.map_range(n, 0.3, 0.7, 0.0, 1.0), _lin(base, 0.88), _lin(base, 1.0))
+    nb.surface(col_out, 0.42, 0.0, nb.bump(n, 0.05, 0.002))
 
 
 def build_hair(nb, col):
@@ -389,7 +421,9 @@ PARAMETRIC = {
     "denim": ("fabric", lambda nb, c: build_denim(nb, c)),
     "leather": ("leather", lambda nb, c: build_leather(nb, c)),
     "skin": ("skin", lambda nb, c: build_skin(nb, c)),
+    "face": ("skin", lambda nb, c: build_face(nb, c)),
     "hair": ("hair", lambda nb, c: build_hair(nb, c)),
+    "lips": ("skin", lambda nb, c: build_lips(nb, c)),
     "eye": ("eye", lambda nb, c: build_eye(nb, c)),
     "foliage": ("fabric", lambda nb, c: build_fabric(nb, c, weave=40.0, rough=0.8)),
     "emit": ("emit", lambda nb, c: build_emit(nb, c)),

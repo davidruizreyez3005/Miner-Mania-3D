@@ -5,7 +5,7 @@
   "grips": {
     "pickaxe":  {"socket": "hand_tool.L", "relative_to": "hand_tool.R", "offset": [0.0, -0.30, 0.0], "rotation_deg": [0.0, 0.0, 0.0]},
     "shovel":   {"socket": "hand_tool.L", "relative_to": "hand_tool.R", "offset": [0.0, -0.40, 0.0], "rotation_deg": [0.0, 180.0, 0.0]},
-    "jackhammer": {"socket": "hand_tool.L", "relative_to": "hand_tool.R", "offset": [-0.36, 0.0, 0.0], "rotation_deg": [0.0, 0.0, 180.0]},
+    "jackhammer": {"socket": "hand_tool.L", "relative_to": "hand_tool.R", "offset": [0.0, 0.36, 0.0], "rotation_deg": [0.0, 0.0, 180.0]},
     "carry_box": {"socket_pair": ["hand_tool.L", "hand_tool.R"], "relative_to": "carry_attachment", "offsets": [[0.255, 0.20, 0.0], [-0.255, 0.20, 0.0]]},
     "cart_bar": {"socket_pair": ["hand_tool.L", "hand_tool.R"], "relative_to": "root", "offsets": [[0.22, -0.56, 0.98], [-0.22, -0.56, 0.98]]},
     "pull_bar": {"socket_pair": ["hand_tool.L", "hand_tool.R"], "relative_to": "root", "offsets": [[0.2, -0.5, 0.92], [-0.2, -0.5, 0.92]]}
