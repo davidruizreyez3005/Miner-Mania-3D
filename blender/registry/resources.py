@@ -1,0 +1,3 @@
+"""resources asset definitions."""
+
+ASSETS = []

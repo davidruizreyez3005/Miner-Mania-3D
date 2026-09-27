@@ -1,0 +1,3 @@
+"""vehicles asset definitions."""
+
+ASSETS = []

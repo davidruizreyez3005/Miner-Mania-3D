@@ -1,0 +1,3 @@
+"""tools asset definitions."""
+
+ASSETS = []

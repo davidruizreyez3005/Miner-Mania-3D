@@ -1,0 +1,123 @@
+{
+  "pipeline": {
+    "name": "Miner Mania 3D procedural asset pipeline",
+    "version": "1.0.0",
+    "copyright": "Miner Mania 3D"
+  },
+  "toolchain": {
+    "blender_version": [4, 5, 14],
+    "gltf_exporter_version": [4, 5, 51],
+    "godot_version": "4.7.2"
+  },
+  "world": {
+    "unit": "meter",
+    "unit_scale": 1.0,
+    "blender_up": "+Z",
+    "blender_front": "-Y",
+    "gltf_up": "+Y",
+    "gltf_front": "+Z",
+    "fps": 30,
+    "worker_height_m": 1.78,
+    "ground_height_m": 0.0
+  },
+  "categories": {
+    "character": {"prefix": "chr_", "output_dir": "characters", "dimensions_m": {"min": [0.35, 0.18, 1.55], "max": [1.9, 1.2, 2.1]}},
+    "animation": {"prefix": "anim_", "output_dir": "animations", "dimensions_m": {"min": [0.35, 0.18, 1.55], "max": [1.9, 1.2, 2.1]}},
+    "machinery": {"prefix": "mach_", "output_dir": "machinery", "dimensions_m": {"min": [0.6, 0.6, 0.6], "max": [16.0, 16.0, 14.0]}},
+    "vehicle": {"prefix": "veh_", "output_dir": "vehicles", "dimensions_m": {"min": [0.6, 1.0, 0.6], "max": [6.0, 14.0, 8.0]}},
+    "building": {"prefix": "bld_", "output_dir": "environment", "dimensions_m": {"min": [2.0, 2.0, 2.0], "max": [30.0, 30.0, 30.0]}},
+    "environment": {"prefix": "env_", "output_dir": "environment", "dimensions_m": {"min": [0.1, 0.1, 0.02], "max": [16.0, 16.0, 14.0]}},
+    "resource": {"prefix": "res_", "output_dir": "resources", "dimensions_m": {"min": [0.4, 0.4, 0.25], "max": [3.5, 3.5, 3.0]}},
+    "prop": {"prefix": "prop_", "output_dir": "props", "dimensions_m": {"min": [0.05, 0.05, 0.05], "max": [7.0, 3.0, 3.0]}},
+    "tool": {"prefix": "tool_", "output_dir": "props", "dimensions_m": {"min": [0.02, 0.02, 0.1], "max": [0.8, 0.8, 1.4]}},
+    "equipment": {"prefix": "eqp_", "output_dir": "props", "dimensions_m": {"min": [0.05, 0.05, 0.05], "max": [0.8, 0.8, 1.0]}}
+  },
+  "budgets": {
+    "tiny_prop":      {"triangles": [150, 2000],    "texture": 256,  "file_size_mb": 1.5, "lods": []},
+    "prop":           {"triangles": [400, 8000],    "texture": 512,  "file_size_mb": 3.0, "lods": [0.5]},
+    "important_prop": {"triangles": [1500, 15000],  "texture": 1024, "file_size_mb": 6.0, "lods": [0.5, 0.25]},
+    "hero_machinery": {"triangles": [5000, 25000],  "texture": 1024, "file_size_mb": 10.0, "lods": [0.5, 0.25, 0.12]},
+    "background_npc": {"triangles": [4000, 12000],  "texture": 512,  "file_size_mb": 6.0, "lods": [0.5]},
+    "worker":         {"triangles": [8000, 30000],  "texture": 1024, "file_size_mb": 12.0, "lods": [0.5, 0.25]},
+    "hero_character": {"triangles": [18000, 50000], "texture": 2048, "file_size_mb": 20.0, "lods": [0.5, 0.25, 0.12]}
+  },
+  "budget_policy": {
+    "max_overshoot_ratio": 0.15,
+    "below_min": "warning"
+  },
+  "textures": {
+    "base_color_format": "JPEG",
+    "orm_format": "JPEG",
+    "normal_format": "PNG",
+    "jpeg_quality": 92,
+    "max_resolution": 2048,
+    "require_power_of_two": true,
+    "bake_margin_px": {"256": 4, "512": 6, "1024": 8, "2048": 12},
+    "ao_samples": 24,
+    "min_texel_density_px_per_m": {"character": 180, "tool": 150, "equipment": 150, "default": 40}
+  },
+  "uv": {
+    "island_margin": 0.004,
+    "max_overlap_ratio": 0.002,
+    "min_used_area": 0.25
+  },
+  "lod": {
+    "max_deviation_ratio": [0.012, 0.025, 0.05],
+    "screen_ratio": [0.35, 0.15, 0.06],
+    "min_triangles": 64,
+    "max_dropped_part_ratio": 0.12,
+    "texture_scale": [0.5, 0.25, 0.25]
+  },
+  "collision": {
+    "max_hulls": 24,
+    "max_hull_vertices": 96,
+    "max_total_triangles": 2400,
+    "bounds_tolerance_m": 0.12,
+    "convexity_epsilon_m": 0.002,
+    "character_capsule": {"radius": 0.3, "height": 1.8}
+  },
+  "deformation": {
+    "max_edge_stretch": 2.4,
+    "min_edge_ratio": 0.3,
+    "max_flipped_face_ratio": 0.004,
+    "min_joint_thickness_ratio": 0.45,
+    "max_influences": 4,
+    "weight_sum_tolerance": 0.001,
+    "min_weight": 0.01,
+    "symmetry_tolerance": 0.02
+  },
+  "animation": {
+    "fps": 30,
+    "min_duration_s": 0.25,
+    "max_duration_s": 12.0,
+    "max_bone_translation_m": 2.5,
+    "loop_rotation_tolerance_deg": 1.5,
+    "loop_translation_tolerance_m": 0.01,
+    "foot_contact_height_m": 0.045,
+    "foot_slide_max_m": 0.035,
+    "grip_tolerance_m": 0.025,
+    "quaternion_norm_tolerance": 0.001
+  },
+  "export": {
+    "jpeg_quality": 92,
+    "influences": 4,
+    "draco": false
+  },
+  "validation": {
+    "allowed_warning_codes": [
+      "BUDGET_BELOW_MIN",
+      "TEXEL_DENSITY_LOW",
+      "LOD_TRIANGLE_TARGET_MISSED",
+      "KHRONOS_WARNING"
+    ],
+    "khronos_ignored_codes": [
+      "UNUSED_OBJECT",
+      "NODE_SKINNED_MESH_NON_ROOT",
+      "IMAGE_NPOT_DIMENSIONS"
+    ]
+  },
+  "godot": {
+    "required_import_success": true,
+    "aabb_tolerance_m": 0.05
+  }
+}

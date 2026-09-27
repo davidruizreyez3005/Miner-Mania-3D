@@ -1,0 +1,3 @@
+"""characters asset definitions."""
+
+ASSETS = []

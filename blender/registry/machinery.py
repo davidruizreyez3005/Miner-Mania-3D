@@ -1,0 +1,3 @@
+"""machinery asset definitions."""
+
+ASSETS = []

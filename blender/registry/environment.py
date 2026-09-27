@@ -1,0 +1,3 @@
+"""environment asset definitions."""
+
+ASSETS = []

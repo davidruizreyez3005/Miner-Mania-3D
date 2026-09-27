@@ -1,0 +1,37 @@
+# ---- Generated game assets -------------------------------------------------
+# GLBs, manifests and reports are regenerated from source by
+# `blender --background --python blender/build.py` (locally or in CI, where
+# they are published as workflow artifacts). They are intentionally not
+# versioned; see docs/asset_pipeline.md.
+assets/generated/**/*.glb
+assets/generated/**/*.gltf
+assets/generated/**/*.bin
+assets/generated/**/*.png
+assets/generated/**/*.jpg
+assets/generated/**/*.import
+assets/manifests/*.json
+assets/reports/*
+!assets/reports/README.md
+.pipeline_work/
+
+# ---- Blender temporaries -------------------------------------------------------
+*.blend1
+*.blend@
+*.blend
+__pycache__/
+*.py[cod]
+
+# ---- Godot -------------------------------------------------------------------------
+.godot/
+export_presets.local.cfg
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# ---- Tooling --------------------------------------------------------------------------
+node_modules/
+.pytest_cache/
+.venv/
+/tools_cache/
+.DS_Store
