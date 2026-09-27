@@ -12,6 +12,8 @@ assets/generated/**/*.import
 assets/manifests/*.json
 assets/reports/*
 !assets/reports/README.md
+!assets/reports/.gdignore
+godot_import.log
 .pipeline_work/
 
 # ---- Blender temporaries -------------------------------------------------------

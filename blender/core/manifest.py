@@ -32,6 +32,7 @@ def _entry(result, cfg):
         "bounds_min_m": main.bounds_min,
         "bounds_max_m": main.bounds_max,
         "sockets": main.sockets,
+        "socket_transforms": main.socket_transforms,
         "file_size_bytes": main.file_size,
         "sha256": main.sha256,
         "budget": d.budget,

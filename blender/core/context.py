@@ -77,6 +77,7 @@ class OutputRecord:
     uv: dict = field(default_factory=dict)
     collision_shapes: int = 0
     sockets: list = field(default_factory=list)
+    socket_transforms: list = field(default_factory=list)
     validated: bool = False
     checks: dict = field(default_factory=dict)
     clip_files: dict = field(default_factory=dict)

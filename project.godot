@@ -1,0 +1,26 @@
+; Godot 4 project for Miner Mania 3D.
+;
+; The generated asset library (assets/generated, built by
+; `blender --background --python blender/build.py`) is imported here and
+; validated headlessly by godot/pipeline/validate_assets.gd. Pipeline sources,
+; tools, docs, manifests and reports carry a .gdignore so Godot never imports them.
+
+config_version=5
+
+[application]
+
+config/name="Miner Mania 3D"
+config/description="Mobile mining tycoon: generated 3D asset library and its import validation."
+config/features=PackedStringArray("4.7", "Mobile")
+
+[importer_defaults]
+
+scene={
+"import_script/path": "res://godot/pipeline/asset_post_import.gd"
+}
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/vram_compression/import_etc2_astc=true

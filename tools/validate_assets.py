@@ -209,8 +209,14 @@ def _mutations_animated(data, expect):
     j = copy.deepcopy(js)
     j["animations"] = j["animations"][1:]
     out.append(("missing animation clip", _pack(j, bytes(bin_)), expect, {"MISSING_ANIMATION", "EMPTY_ANIMATION"}))
-    anim = js["animations"][0]
-    rot = next((c for c in anim["channels"] if c["target"].get("path") == "rotation"), None)
+    # The densest rotation channel (constant bones are exported with two keys).
+    anim, rot, best = None, None, -1
+    for a in js["animations"]:
+        for c in a["channels"]:
+            if c["target"].get("path") == "rotation":
+                n = js["accessors"][a["samplers"][c["sampler"]]["input"]]["count"]
+                if n > best:
+                    anim, rot, best = a, c, n
     if rot is not None:
         sampler = anim["samplers"][rot["sampler"]]
         b = bytearray(bin_)

@@ -1,0 +1,274 @@
+name: Assets
+
+# Headless asset pipeline: pinned Blender builds every registered asset
+# (clean -> generate -> rig -> animate -> optimize -> collision -> LOD ->
+# export -> validate -> manifest -> report, per asset), the GLBs are
+# re-validated standalone (own inspector + Khronos glTF-Validator + a negative
+# self-test), then imported and checked in pinned Godot. A small smoke set runs
+# first; the full collection only builds after the smoke gate passes.
+#
+# Reusable from other workflows (e.g. the Android build) via workflow_call.
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "blender/**"
+      - "assets/source/**"
+      - "godot/**"
+      - "tools/**"
+      - "project.godot"
+      - "requirements.txt"
+      - ".github/workflows/assets.yml"
+  pull_request:
+    paths:
+      - "blender/**"
+      - "assets/source/**"
+      - "godot/**"
+      - "tools/**"
+      - "project.godot"
+      - "requirements.txt"
+      - ".github/workflows/assets.yml"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "smoke = representative sample only; full = whole library after the smoke gate"
+        type: choice
+        options: [full, smoke]
+        default: full
+      verify_determinism:
+        description: "Rebuild the full set a second time and require byte-identical GLBs"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      profile:
+        type: string
+        default: full
+      verify_determinism:
+        type: boolean
+        default: false
+    outputs:
+      assets_artifact:
+        description: "Artifact holding the generated GLBs, manifests and reports"
+        value: ${{ jobs.full.outputs.artifact }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash          # bash -eo pipefail: a failing tool is never masked by `| tee`
+
+concurrency:
+  group: assets-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+  TOOLS_DIR: ${{ github.workspace }}/../mm-tools
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  smoke:
+    name: Smoke test (worker, machine, vehicle, resource, prop)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install pinned Python dependencies
+        run: python -m pip install --require-hashes -r requirements.txt
+
+      - name: Install system libraries for headless Blender
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            libx11-6 libxrender1 libxfixes3 libxi6 libxkbcommon0 libxcb1 libxext6 \
+            libsm6 libice6 libgl1 libegl1 libxxf86vm1
+
+      - name: Cache pinned Blender and Godot
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TOOLS_DIR }}
+          key: mm-tools-blender-4.5.14-9ba871ff-godot-4.7.2-9aa00f7a
+
+      - name: Install pinned Blender
+        run: echo "BLENDER=$(tools/ci/install_blender.sh "$TOOLS_DIR/blender")" >> "$GITHUB_ENV"
+
+      - name: Verify Blender version
+        run: |
+          version="$("$BLENDER" --background --factory-startup --version)"
+          echo "$version"
+          grep -qF "Blender 4.5.14" <<< "$version"
+
+      - name: Set up Node (Khronos glTF-Validator)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: tools/gltf_validator/package-lock.json
+
+      - name: Install pinned glTF-Validator
+        run: npm ci --prefix tools/gltf_validator
+
+      - name: Smoke build (generate, rig, animate, export, LOD, collision, validate, manifest, report)
+        run: |
+          "$BLENDER" --background --factory-startup --python blender/build.py -- --profile smoke
+
+      - name: Validate assets (standalone re-inspection, checksums, Khronos, negative self-test)
+        run: python tools/validate_assets.py --khronos --self-test
+
+      - name: Install pinned Godot
+        run: echo "GODOT=$(tools/ci/install_godot.sh "$TOOLS_DIR/godot")" >> "$GITHUB_ENV"
+
+      - name: Godot import
+        run: |
+          "$GODOT" --headless --path . --import 2>&1 | tee godot_import.log
+          if sed 's/\x1b\[[0-9;]*m//g' godot_import.log | grep -E "^(ERROR|SCRIPT ERROR)"; then
+            echo "Godot reported import errors" >&2
+            exit 1
+          fi
+
+      - name: Godot asset validation
+        run: |
+          "$GODOT" --headless --path . --script res://godot/pipeline/validate_assets.gd
+
+      - name: Build summary
+        if: always()
+        run: python tools/ci/summarize.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload smoke reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-reports
+          path: |
+            assets/reports/
+            assets/manifests/
+            godot_import.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload smoke assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-assets
+          path: assets/generated/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 1
+
+  full:
+    name: Full asset build
+    needs: smoke
+    if: ${{ inputs.profile != 'smoke' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    outputs:
+      artifact: generated-assets
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install pinned Python dependencies
+        run: python -m pip install --require-hashes -r requirements.txt
+
+      - name: Install system libraries for headless Blender
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            libx11-6 libxrender1 libxfixes3 libxi6 libxkbcommon0 libxcb1 libxext6 \
+            libsm6 libice6 libgl1 libegl1 libxxf86vm1
+
+      - name: Cache pinned Blender and Godot
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TOOLS_DIR }}
+          key: mm-tools-blender-4.5.14-9ba871ff-godot-4.7.2-9aa00f7a
+
+      - name: Install pinned Blender
+        run: echo "BLENDER=$(tools/ci/install_blender.sh "$TOOLS_DIR/blender")" >> "$GITHUB_ENV"
+
+      - name: Verify Blender version
+        run: |
+          version="$("$BLENDER" --background --factory-startup --version)"
+          echo "$version"
+          grep -qF "Blender 4.5.14" <<< "$version"
+
+      - name: Set up Node (Khronos glTF-Validator)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: tools/gltf_validator/package-lock.json
+
+      - name: Install pinned glTF-Validator
+        run: npm ci --prefix tools/gltf_validator
+
+      - name: Full build (generate, rig, animate, export, LOD, collision, validate, manifest, report)
+        env:
+          DETERMINISM: ${{ inputs.verify_determinism && '--verify-determinism' || '' }}
+        run: |
+          "$BLENDER" --background --factory-startup --python blender/build.py -- --profile full --keep-going $DETERMINISM
+
+      - name: Validate assets (standalone re-inspection, checksums, stale files, Khronos, negative self-test)
+        run: python tools/validate_assets.py --khronos --self-test
+
+      - name: Install pinned Godot
+        run: echo "GODOT=$(tools/ci/install_godot.sh "$TOOLS_DIR/godot")" >> "$GITHUB_ENV"
+
+      - name: Godot import
+        run: |
+          "$GODOT" --headless --path . --import 2>&1 | tee godot_import.log
+          if sed 's/\x1b\[[0-9;]*m//g' godot_import.log | grep -E "^(ERROR|SCRIPT ERROR)"; then
+            echo "Godot reported import errors" >&2
+            exit 1
+          fi
+
+      - name: Godot asset validation
+        run: |
+          "$GODOT" --headless --path . --script res://godot/pipeline/validate_assets.gd
+
+      - name: Build summary
+        if: always()
+        run: python tools/ci/summarize.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-reports
+          path: |
+            assets/reports/
+            assets/manifests/
+            godot_import.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload generated assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-assets
+          path: |
+            assets/generated/
+            assets/manifests/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 1

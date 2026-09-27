@@ -309,6 +309,16 @@ def stage_export(ctx):
         ctx.record.collision = paths.rel(p)
         ctx.record.collision_shapes = len(ctx.collision_objects)
     ctx.record.sockets = [s.name for s in ctx.sockets]
+    ctx.record.socket_transforms = []
+    for s in ctx.sockets:
+        loc, rot, _ = s.matrix.decompose()
+        ctx.record.socket_transforms.append({
+            "name": s.name, "bone": s.bone,
+            # Blender Z-up / -Y front; Godot (glTF) Y-up / +Z front: (x, y, z) -> (x, z, -y).
+            "blender_location_m": [round(v, 4) for v in loc],
+            "godot_location_m": [round(loc.x, 4), round(loc.z, 4), round(-loc.y, 4)],
+            "blender_rotation_quat_wxyz": [round(v, 5) for v in rot],
+        })
     ctx.record.texture_resolution = ctx.texture_size
     if ctx.defn.category == "animation" and animated:
         from exporters import glb_split
