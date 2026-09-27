@@ -45,13 +45,14 @@ def _tint(c, t, amount):
 
 def _wear_masks(nb, wear, grime, scale=1.0):
     """Edge wear from pointiness broken up by noise; grime from baked AO."""
-    p = nb.pointiness()
-    edge = nb.map_range(p, 0.52, 0.60, 0.0, 1.0, smooth=True)
+    edge = nb.map_range(nb.edge_mask(), 0.15, 0.7, 0.0, 1.0, smooth=True)
     brk = nb.noise(nb.coord(14.0 * scale), detail=3.0, roughness=0.6)
     brk = nb.map_range(brk, 0.35, 0.62, 0.0, 1.0)
     wear_m = nb.math("MULTIPLY", nb.math("MULTIPLY", edge, brk), wear * 1.6, clamp=True)
     ao = nb.ao_mask()
-    cav = nb.map_range(ao, 0.35, 0.95, 1.0, 0.0)
+    # Grime collects in real crevices only: a wide AO falloff smeared broad
+    # dark patches ("camouflage") over large panels.
+    cav = nb.map_range(ao, 0.45, 0.88, 1.0, 0.0, smooth=True)
     gn = nb.noise(nb.coord(3.0 * scale), detail=4.0, roughness=0.55)
     gn = nb.map_range(gn, 0.3, 0.7, 0.4, 1.0)
     grime_m = nb.math("MULTIPLY", nb.math("MULTIPLY", cav, gn), grime * 1.4, clamp=True)
@@ -71,7 +72,7 @@ def build_paint(nb, col, rough=0.45, wear=0.35, grime=0.35, stripes=None):
     wear_m, grime_m = _wear_masks(nb, wear, grime)
     steel = color("steel")
     col_out = nb.mix(wear_m, paint, steel)
-    col_out = nb.mix(grime_m, col_out, _tint(_lin(base, 0.35), color("rust"), 0.35))
+    col_out = nb.mix(grime_m, col_out, _tint(_lin(base, 0.5), color("rust"), 0.3))
     rough_out = nb.mixf(wear_m, rough, 0.32)
     rough_out = nb.mixf(grime_m, rough_out, 0.85)
     metal_out = nb.mixf(wear_m, 0.0, 1.0)
@@ -403,7 +404,7 @@ FIXED = {
 
 PARAMETRIC = {
     "paint": ("paint", lambda nb, c: build_paint(nb, c)),
-    "paint_worn": ("paint", lambda nb, c: build_paint(nb, c, wear=0.7, grime=0.55, rough=0.55)),
+    "paint_worn": ("paint", lambda nb, c: build_paint(nb, c, wear=0.55, grime=0.4, rough=0.52)),
     "paint_clean": ("paint", lambda nb, c: build_paint(nb, c, wear=0.08, grime=0.15, rough=0.35)),
     "metal": ("metal", lambda nb, c: build_metal(nb, c)),
     "plastic": ("plastic", lambda nb, c: build_plastic(nb, c)),

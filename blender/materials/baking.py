@@ -18,7 +18,7 @@ import numpy as np
 from core import scene as scn
 from core.errors import PipelineError
 
-from .nodes import AO_NODE
+from .nodes import AO_NODE, EDGE_NODE
 
 TARGET_NODE = "mm_bake_target"
 
@@ -123,6 +123,32 @@ def _restore_bsdf(mat, em):
     nt = mat.node_tree
     nt.links.new(_principled(mat).outputs["BSDF"], _output(mat).inputs["Surface"])
     nt.nodes.remove(em)
+
+
+def _edge_material(ao_distance):
+    """Emits 1 - dot(bevelled normal, true normal), remapped: bright on convex
+    and concave edges within the bevel radius (scaled with the asset)."""
+    mat = bpy.data.materials.new("__edge_mask__")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bev = nt.nodes.new("ShaderNodeBevel")
+    bev.samples = 8
+    bev.inputs["Radius"].default_value = max(0.004, min(0.02, ao_distance * 0.03))
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    dot = nt.nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    nt.links.new(bev.outputs["Normal"], dot.inputs[0])
+    nt.links.new(geo.outputs["Normal"], dot.inputs[1])
+    rng = nt.nodes.new("ShaderNodeMapRange")
+    rng.inputs["From Min"].default_value = 0.995
+    rng.inputs["From Max"].default_value = 0.82
+    nt.links.new(dot.outputs["Value"], rng.inputs["Value"])
+    em = nt.nodes.new("ShaderNodeEmission")
+    nt.links.new(rng.outputs["Result"], em.inputs["Color"])
+    nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+    return mat
 
 
 BAKE_TIMINGS = {}
@@ -286,6 +312,23 @@ def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
         n = m.node_tree.nodes.get(AO_NODE)
         if n is not None:
             n.image = img_ao
+    # Convex-edge mask (bevel-normal deviation) baked once on the proxy and
+    # fed back like AO: edge wear that does not depend on vertex density.
+    img_edge = _new_image(f"{stem}_edge", size, True)
+    edge_mat = _edge_material(ao_distance)
+    _set_target([edge_mat], img_edge)
+    for i in range(len(saved)):
+        proxy.data.materials[i] = edge_mat
+    try:
+        _bake("EMIT", margin, 1)
+    finally:
+        for i, m in enumerate(saved):
+            proxy.data.materials[i] = m
+        bpy.data.materials.remove(edge_mat)
+    for m in mats:
+        n = m.node_tree.nodes.get(EDGE_NODE)
+        if n is not None:
+            n.image = img_edge
 
     _set_target(mats, img_nrm)
     _bake("NORMAL", margin, 1, normal_space="TANGENT", normal_r="POS_X", normal_g="POS_Y", normal_b="POS_Z")
@@ -337,7 +380,7 @@ def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
         "metallic_mean": float(mt[..., 0].mean()),
         "roughness_mean": float(rg[..., 0].mean()),
     }
-    for img in (img_ao, img_nrm, img_col, img_rgh, img_met, img_orm, img_emi):
+    for img in (img_ao, img_edge, img_nrm, img_col, img_rgh, img_met, img_orm, img_emi):
         if img is not None:
             bpy.data.images.remove(img)
     return paths, stats

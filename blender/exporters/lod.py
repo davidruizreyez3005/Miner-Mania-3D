@@ -81,6 +81,9 @@ def _remove_degenerate(obj, min_edge=1e-5):
         bmesh.ops.triangulate(bm, faces=ngons, quad_method="BEAUTY", ngon_method="BEAUTY")
     bm.to_mesh(obj.data)
     bm.free()
+    # The glTF exporter runs Mesh.validate() in place (dropping duplicate or
+    # malformed faces); do it here so recorded and exported counts agree.
+    obj.data.validate(clean_customdata=False)
     obj.data.update()
 
 

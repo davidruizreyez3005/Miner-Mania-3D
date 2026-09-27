@@ -5,7 +5,18 @@ import bpy
 from utilities.meshkit import PATTERN_ATTR
 
 AO_NODE = "mm_ao_mask"
+EDGE_NODE = "mm_edge_mask"
 PLACEHOLDER_IMAGE = "mm_white_placeholder"
+BLACK_PLACEHOLDER = "mm_black_placeholder"
+
+
+def black_placeholder():
+    img = bpy.data.images.get(BLACK_PLACEHOLDER)
+    if img is None:
+        img = bpy.data.images.new(BLACK_PLACEHOLDER, 4, 4, alpha=False)
+        img.generated_color = (0.0, 0.0, 0.0, 1.0)
+        img.colorspace_settings.name = "Non-Color"
+    return img
 
 
 def placeholder_image():
@@ -74,6 +85,17 @@ class NB:
         if self._geom is None:
             self._geom = self.new("ShaderNodeNewGeometry")
         return self._geom
+
+    def edge_mask(self):
+        """Baked convex-edge mask (black until the edge pass has run). Unlike
+        pointiness it does not depend on vertex density, so wear stays on the
+        edges of large low-poly panels."""
+        if getattr(self, "_edge", None) is None:
+            n = self.new("ShaderNodeTexImage", name=EDGE_NODE, label=EDGE_NODE)
+            n.image = black_placeholder()
+            n.interpolation = "Linear"
+            self._edge = n.outputs["Color"]
+        return self._edge
 
     def ao_mask(self):
         """Baked ambient occlusion (white until the AO pass has run)."""

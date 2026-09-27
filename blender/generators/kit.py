@@ -383,21 +383,26 @@ def warning_sign(g, center, facing=(0.0, -1.0, 0.0), size=0.3, mat="paint_clean:
 # ------------------------------------------------------------------ wheels / tracks
 
 def wheel(g_tire, g_rim, center, axis, r, width, rim_ratio=0.62, rim_mat="paint:industrial_yellow", lugs=10,
-          tread=True):
-    """Tyre with tread blocks plus a dished rim with lug nuts."""
+          tread=True, g_tread=None, tread_pitch=0.24):
+    """Tyre with chevron tread blocks plus a dished rim with lug nuts.
+
+    Tread blocks are unbevelled boxes every ``tread_pitch`` metres of
+    circumference (about 20 per side on a 0.8 m tyre) and may go into their
+    own LOD-droppable geo."""
     f = axis_frame(center, axis)
     w = width / 2
     prof = [(r * rim_ratio, -w), (r * 0.94, -w), (r, -w * 0.7), (r, w * 0.7), (r * 0.94, w), (r * rim_ratio, w)]
     g_tire.lathe(prof, segments=32, matrix=f, mat=RUBBER, caps=False, closed_loop=True)
     if tread:
-        n = max(12, int(2 * math.pi * r / 0.09))
+        gt = g_tread or g_tire
+        n = max(12, int(2 * math.pi * r / tread_pitch))
         for k in range(n):
-            a = 2 * math.pi * k / n
+            a = 2 * math.pi * (k + 0.5 * (k % 2)) / n
             for s in (-1, 1):
                 # Block: radial height, tangential length, axial width; skewed for a chevron tread.
-                g_tire.box((r * 0.06, r * 0.075, width * 0.42),
-                           matrix=f @ trs((math.cos(a) * r, math.sin(a) * r, s * w * 0.45), (0, 0, math.degrees(a)))
-                           @ trs(rot=(s * 14, 0, 0)), mat=RUBBER, bevel=0.004)
+                gt.box((r * 0.07, r * 0.12, width * 0.44),
+                       matrix=f @ trs((math.cos(a) * r, math.sin(a) * r, s * w * 0.45), (0, 0, math.degrees(a)))
+                       @ trs(rot=(s * 18, 0, 0)), mat=RUBBER)
     rr = r * rim_ratio
     g_rim.lathe([(0.0, -w * 0.5), (rr * 0.5, -w * 0.5), (rr * 0.55, -w * 0.2), (rr, -w * 0.8), (rr, w * 0.8),
                  (rr * 0.55, w * 0.4), (0.0, w * 0.4)], segments=28, matrix=f, mat=rim_mat)

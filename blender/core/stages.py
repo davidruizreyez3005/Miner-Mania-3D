@@ -133,6 +133,7 @@ def _clean_parts(parts):
                               ngon_method="BEAUTY")
         bm.to_mesh(o.data)
         bm.free()
+        o.data.validate(clean_customdata=False)     # the exporter would otherwise fix it silently
         o.data.update()
 
 
@@ -176,9 +177,11 @@ def stage_optimize(ctx):
         raise PipelineError("asset has no bakeable (textured) surfaces")
     angle = 60.0 if ctx.character is not None else 52.0
     pad_px = int(ctx.cfg["textures"]["bake_margin_px"].get(str(ctx.texture_size), 8))
-    # Island gap of ~half the bake padding: bleeding stays inside each island's
-    # own dilation while small detail islands waste less atlas space.
-    margin = max(ctx.cfg["uv"]["island_margin"], 0.5 * pad_px / float(ctx.texture_size))
+    # pack_islands(ADD) grows every island by the margin, so the gap between
+    # neighbours is twice this value: a quarter of the bake padding gives a
+    # gap of half the padding (4 px at 1024), which the dilation fills from
+    # the nearest island, while small detail islands waste far less space.
+    margin = max(ctx.cfg["uv"]["island_margin"], 0.25 * pad_px / float(ctx.texture_size))
     t1 = time.time()
     uv.unwrap_atlas(baked, margin=margin, angle_limit_deg=angle)
     t_uv = time.time() - t1
@@ -392,12 +395,11 @@ def stage_post_validate(ctx):
         for e in r.errors:
             issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(lod['model'])}: {e['message']}"))
         lod["sha256"] = _sha256(os.path.join(paths.REPO_ROOT, lod["model"]))
-        # The GLB is authoritative. The exporter occasionally merges a couple of
-        # coincident sliver triangles of heavily decimated meshes; a larger gap
-        # means geometry went missing.
+        # Meshes are validated before counting (the exporter's own validate()
+        # therefore changes nothing): the counts must agree exactly.
         exported = int(r.stats.get("triangles") or 0)
         delta = lod["triangles"] - exported
-        if abs(delta) > max(4, 0.005 * lod["triangles"]):
+        if delta:
             issues.append(ValidationIssue("error", "LOD_TRIANGLE_MISMATCH",
                                           f"LOD{lod['level']} GLB has {exported} tris, Blender LOD had {lod['triangles']}"))
         lod["export_triangle_delta"] = delta

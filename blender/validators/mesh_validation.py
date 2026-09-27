@@ -70,9 +70,8 @@ def validate_uv(ctx):
     # above). The 256-cell raster ratio undercounts thin islands (beams, rods)
     # and is reported only as a diagnostic.
     coverage = min(1.0, s["uv_area"])
-    # Hard-surface categories pack many small islands (fasteners, rails), each
-    # with a constant bake-padding gap, so their floor is lower; texel density
-    # is still enforced below.
+    # Optional per-category floors (none configured today); texel density is
+    # enforced separately below.
     floor = ucfg.get("min_used_area_by_category", {}).get(ctx.defn.category, ucfg["min_used_area"])
     # Explicit per-asset override (registry params) for shapes that unwrap as
     # one long island, e.g. a silo shell; recorded in the asset manifest.

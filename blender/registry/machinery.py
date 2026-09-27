@@ -21,11 +21,8 @@ ASSETS = [
       tags=("washer", "processing"), description="Trommel drum washer with girth-gear drive and spray bar"),
     M(id="mach_sorter_01", generator="machinery.sorter", seed=4108, budget="important_prop",
       tags=("sorter", "processing"), description="Double-deck vibrating screen on coil springs"),
-    # The 9.4 m x 4 m cylindrical shell unwraps as one long island, so the
-    # atlas cannot be filled to the machinery floor (0.2).
     M(id="mach_silo_01", generator="machinery.silo", seed=4109, budget="important_prop",
-      params={"uv_min_coverage": 0.15}, tags=("storage",),
-      description="Ore silo with slide gate, caged ladder and level gauge"),
+      tags=("storage",), description="Ore silo with slide gate, caged ladder and level gauge"),
     M(id="mach_processor_01", generator="machinery.processor", seed=4110, budget="hero_machinery",
       tags=("processing", "tank"), description="Agitated leach tank with launder, control valve and gauge"),
 ]

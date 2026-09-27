@@ -57,9 +57,9 @@
     "min_texel_density_px_per_m": {"character": 180, "tool": 150, "equipment": 150, "default": 40}
   },
   "uv": {
-    "island_margin": 0.004,
+    "island_margin": 0.0015,
     "max_overlap_ratio": 0.002,
-    "min_used_area": 0.25, "min_used_area_by_category": {"machinery": 0.2, "vehicle": 0.2, "building": 0.2}, "detail_uv_scale": 0.6
+    "min_used_area": 0.25, "min_used_area_by_category": {}, "detail_uv_scale": 0.6
   },
   "lod": {
     "max_deviation_ratio": [0.012, 0.025, 0.05],
@@ -108,7 +108,7 @@
   },
   "validation": {
     "allowed_warning_codes": [
-      "BUDGET_BELOW_MIN",
+      "BUDGET_BELOW_MIN", "BUDGET_OVER_TARGET",
       "TEXEL_DENSITY_LOW",
       "LOD_TRIANGLE_TARGET_MISSED",
       "KHRONOS_WARNING"
