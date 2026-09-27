@@ -142,6 +142,10 @@ class BuildContext:
     def geo(self, name, bone=None, max_lod=99, attach=None, shade="auto", smooth_angle=32.0, weighted=True):
         from utilities.meshkit import Geo
         g = Geo(f"{self.name}__{name}", mm_part=name, mm_max_lod=int(max_lod))
+        if max_lod < 99:
+            # LOD-droppable details are small and seen up close only: give the
+            # big surfaces the texels.
+            g.props["mm_uv_scale"] = float(self.cfg["uv"].get("detail_uv_scale", 1.0))
         if bone:
             g.props["mm_bone"] = bone
         if attach:

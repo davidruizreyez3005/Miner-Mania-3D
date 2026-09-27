@@ -430,7 +430,9 @@ PARAMETRIC = {
     "emit_soft": ("emit", lambda nb, c: build_emit(nb, c, strength=1.5)),
 }
 
-NON_BAKED_KINDS = {"glass", "emit"}
+# Glass stays a separate (alpha-blended) material; emissive colours are baked
+# into the atlas's emissive map so lamps do not add draw calls.
+NON_BAKED_KINDS = {"glass"}
 
 
 class MaterialLibrary:

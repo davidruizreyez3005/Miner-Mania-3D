@@ -91,6 +91,34 @@ def _emit_link(mat, socket_name):
     return em
 
 
+def _emission_link(mat):
+    """Route the material's emitted radiance (colour x strength, clamped to
+    the 0..1 texture range) into an Emission shader for the bake."""
+    nt = mat.node_tree
+    bsdf = _principled(mat)
+    out = _output(mat)
+    em = nt.nodes.new("ShaderNodeEmission")
+    strength = float(bsdf.inputs["Emission Strength"].default_value)
+    em.inputs["Strength"].default_value = min(1.0, max(0.0, strength))
+    src = bsdf.inputs["Emission Color"]
+    if src.is_linked:
+        nt.links.new(src.links[0].from_socket, em.inputs["Color"])
+    else:
+        v = src.default_value
+        em.inputs["Color"].default_value = (v[0], v[1], v[2], 1.0)
+    nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+    return em
+
+
+def _emits(mat):
+    bsdf = _principled(mat)
+    strength = bsdf.inputs["Emission Strength"]
+    colour = bsdf.inputs["Emission Color"]
+    if strength.is_linked or colour.is_linked:
+        return True
+    return strength.default_value > 0.0 and max(colour.default_value[:3]) > 0.0
+
+
 def _restore_bsdf(mat, em):
     nt = mat.node_tree
     nt.links.new(_principled(mat).outputs["BSDF"], _output(mat).inputs["Surface"])
@@ -135,7 +163,7 @@ def gltf_output_group():
     return grp
 
 
-def build_final_material(name, base_path, orm_path, normal_path):
+def build_final_material(name, base_path, orm_path, normal_path, emissive_path=None):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     mat.use_backface_culling = True  # closed game meshes: export doubleSided=false
@@ -169,6 +197,10 @@ def build_final_material(name, base_path, orm_path, normal_path):
     links.new(nrm.outputs["Color"], nmap.inputs["Color"])
     links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
     bsdf.inputs["Specular IOR Level"].default_value = 0.5
+    if emissive_path:
+        emi = tex(emissive_path, False)
+        links.new(emi.outputs["Color"], bsdf.inputs["Emission Color"])
+        bsdf.inputs["Emission Strength"].default_value = 1.0
     mat["mm_key"] = name
     mat["mm_kind"] = "baked"
     mat["mm_baked"] = False
@@ -266,6 +298,17 @@ def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
         finally:
             for m, em in emitters:
                 _restore_bsdf(m, em)
+    # Emissive map only for assets with lamps/indicators (keeps others at 3 textures).
+    img_emi = None
+    if any(_emits(m) for m in mats):
+        img_emi = _new_image(f"{stem}_emissive", size, False)
+        _set_target(mats, img_emi)
+        emitters = [(m, _emission_link(m)) for m in mats]
+        try:
+            _bake("EMIT", margin, 1)
+        finally:
+            for m, em in emitters:
+                _restore_bsdf(m, em)
 
     os.makedirs(work_dir, exist_ok=True)
     ao = _pixels(img_ao)
@@ -281,9 +324,11 @@ def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
     q = int(tcfg["jpeg_quality"])
     ext = {"JPEG": ".jpg", "PNG": ".png"}
     paths = {}
-    for key, img, fmt in (("base_color", img_col, tcfg["base_color_format"]),
-                          ("orm", img_orm, tcfg["orm_format"]),
-                          ("normal", img_nrm, tcfg["normal_format"])):
+    outputs = [("base_color", img_col, tcfg["base_color_format"]), ("orm", img_orm, tcfg["orm_format"]),
+               ("normal", img_nrm, tcfg["normal_format"])]
+    if img_emi is not None:
+        outputs.append(("emissive", img_emi, tcfg["base_color_format"]))
+    for key, img, fmt in outputs:
         p = os.path.join(work_dir, f"{stem}_{key}{ext[fmt]}")
         _save(img, p, fmt, q)
         paths[key] = p
@@ -292,8 +337,9 @@ def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
         "metallic_mean": float(mt[..., 0].mean()),
         "roughness_mean": float(rg[..., 0].mean()),
     }
-    for img in (img_ao, img_nrm, img_col, img_rgh, img_met, img_orm):
-        bpy.data.images.remove(img)
+    for img in (img_ao, img_nrm, img_col, img_rgh, img_met, img_orm, img_emi):
+        if img is not None:
+            bpy.data.images.remove(img)
     return paths, stats
 
 

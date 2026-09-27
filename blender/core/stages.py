@@ -193,7 +193,8 @@ def stage_optimize(ctx):
     log.info(f"optimize timings: clean {t_clean:.1f}s uv {t_uv:.1f}s uv_stats {t_stats:.1f}s "
              f"bake {time.time() - t2:.1f}s {dict(baking.BAKE_TIMINGS)}")
     ctx.texture_paths = tex_paths
-    mat = baking.build_final_material(f"M_{ctx.name}", tex_paths["base_color"], tex_paths["orm"], tex_paths["normal"])
+    mat = baking.build_final_material(f"M_{ctx.name}", tex_paths["base_color"], tex_paths["orm"], tex_paths["normal"],
+                                      tex_paths.get("emissive"))
     baking.replace_with_baked(baked, mat)
     ctx.metadata["bake"] = {k: round(v, 4) for k, v in stats.items()}
     ctx.parts = parts
@@ -241,8 +242,9 @@ def stage_validate(ctx):
             issues.append(ValidationIssue("error", "LOD_NOT_REDUCED", f"LOD{r['level']} ({r['triangles']}) >= LOD0 ({tris})"))
         if r["largest_dropped_ratio"] > ctx.cfg["lod"]["max_dropped_part_ratio"]:
             issues.append(ValidationIssue("error", "LOD_DROPPED_LARGE_PART",
-                                          f"LOD{r['level']} dropped a part spanning {r['largest_dropped_ratio']:.2f} of the "
-                                          f"asset diagonal (only small details may be removed)"))
+                                          f"LOD{r['level']} dropped part '{r.get('largest_dropped_part', '?')}' with an "
+                                          f"island spanning {r['largest_dropped_ratio']:.2f} of the asset diagonal "
+                                          f"(only small details may be removed)"))
         if r["deviation_ratio"] > r["max_deviation_ratio"]:
             issues.append(ValidationIssue("error", "LOD_SILHOUETTE",
                                           f"LOD{r['level']} deviates {r['deviation_m'] * 100:.1f} cm "
@@ -310,8 +312,16 @@ def expectations(ctx, kind="main"):
     from core import config
     cfg = ctx.cfg
     b = ctx.budget
+    acfg = dict(cfg["animation"])
+    render_bounds = getattr(ctx, "render_bounds", None)
+    if render_bounds:
+        # Joint rest offsets scale with the asset (a drill head sits 4 m up its
+        # mast); the limit only has to catch runaway values.
+        lo, hi = render_bounds
+        size = max(hi[i] - lo[i] for i in range(3))
+        acfg["max_bone_translation_m"] = max(acfg["max_bone_translation_m"], 1.5 * size)
     exp = {
-        "anim_cfg": cfg["animation"],
+        "anim_cfg": acfg,
         "dims_min": ctx.category_cfg["dimensions_m"]["min"],
         "dims_max": ctx.category_cfg["dimensions_m"]["max"],
         "max_texture": ctx.texture_size,
@@ -382,9 +392,17 @@ def stage_post_validate(ctx):
         for e in r.errors:
             issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(lod['model'])}: {e['message']}"))
         lod["sha256"] = _sha256(os.path.join(paths.REPO_ROOT, lod["model"]))
-        if r.stats.get("triangles") != lod["triangles"]:
+        # The GLB is authoritative. The exporter occasionally merges a couple of
+        # coincident sliver triangles of heavily decimated meshes; a larger gap
+        # means geometry went missing.
+        exported = int(r.stats.get("triangles") or 0)
+        delta = lod["triangles"] - exported
+        if abs(delta) > max(4, 0.005 * lod["triangles"]):
             issues.append(ValidationIssue("error", "LOD_TRIANGLE_MISMATCH",
-                                          f"LOD{lod['level']} GLB has {r.stats.get('triangles')} tris, expected {lod['triangles']}"))
+                                          f"LOD{lod['level']} GLB has {exported} tris, Blender LOD had {lod['triangles']}"))
+        lod["export_triangle_delta"] = delta
+        lod["triangles"] = exported
+    ctx.record.lod_triangles = [lod["triangles"] for lod in ctx.record.lods]
     if ctx.record.collision:
         r = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, ctx.record.collision), expectations(ctx, "collision"))
         for e in r.errors:

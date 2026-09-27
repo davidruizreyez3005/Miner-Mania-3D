@@ -66,8 +66,20 @@ def validate_uv(ctx):
         issues.append(ValidationIssue("error", "UV_OUT_OF_RANGE", f"{s['out_of_range_uvs']} UVs outside 0..1"))
     if s["overlap_ratio"] > ucfg["max_overlap_ratio"]:
         issues.append(ValidationIssue("error", "UV_OVERLAP", f"overlap ratio {s['overlap_ratio']} > {ucfg['max_overlap_ratio']}"))
-    if s["used_ratio"] < ucfg["min_used_area"]:
-        issues.append(ValidationIssue("warning", "UV_LOW_COVERAGE", f"atlas coverage {s['used_ratio']}"))
+    # Coverage = exact summed UV triangle area (islands never overlap: checked
+    # above). The 256-cell raster ratio undercounts thin islands (beams, rods)
+    # and is reported only as a diagnostic.
+    coverage = min(1.0, s["uv_area"])
+    # Hard-surface categories pack many small islands (fasteners, rails), each
+    # with a constant bake-padding gap, so their floor is lower; texel density
+    # is still enforced below.
+    floor = ucfg.get("min_used_area_by_category", {}).get(ctx.defn.category, ucfg["min_used_area"])
+    # Explicit per-asset override (registry params) for shapes that unwrap as
+    # one long island, e.g. a silo shell; recorded in the asset manifest.
+    floor = float(ctx.param("uv_min_coverage", floor))
+    if coverage < floor:
+        issues.append(ValidationIssue("warning", "UV_LOW_COVERAGE",
+                                      f"atlas coverage {coverage:.3f} (raster estimate {s['used_ratio']})"))
     dens = ctx.cfg["textures"]["min_texel_density_px_per_m"]
     want = dens.get(ctx.defn.category, dens["default"])
     if s["texel_density_median"] < want:
