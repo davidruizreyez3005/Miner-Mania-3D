@@ -183,17 +183,27 @@ def stage_optimize(ctx):
     # the nearest island, while small detail islands waste far less space.
     margin = max(ctx.cfg["uv"]["island_margin"], 0.25 * pad_px / float(ctx.texture_size))
     t1 = time.time()
-    uv.unwrap_atlas(baked, margin=margin, angle_limit_deg=angle)
+    # Smart projection can merge a closed profile's cap with side faces that
+    # face the same way at different depths (I-beams, rails): the resulting
+    # island folds over itself. Retry with tighter angle limits, which keep
+    # perpendicular faces out of one projection group; the validator still
+    # fails the asset if every attempt overlaps.
+    for attempt, limit in enumerate((angle, 44.0, 38.0)):
+        uv.unwrap_atlas(baked, margin=margin, angle_limit_deg=limit)
+        stats = uv.uv_stats(baked, ctx.texture_size)
+        if stats["overlap_ratio"] <= ctx.cfg["uv"]["max_overlap_ratio"] or attempt == 2:
+            break
+        log.info(f"UV overlap {stats['overlap_ratio']} at a {limit:.0f} deg angle limit; re-unwrapping tighter")
+    ctx.uv_stats = stats
+    ctx.metadata["uv_angle_limit_deg"] = limit
     t_uv = time.time() - t1
-    ctx.uv_stats = uv.uv_stats(baked, ctx.texture_size)
-    t_stats = time.time() - t1 - t_uv
     lo, hi = scn.world_bounds(parts)
     size = max(hi[i] - lo[i] for i in range(3))
     ao_dist = max(0.06, min(1.2, 0.12 * size)) if ctx.character is None else 0.2
     t2 = time.time()
     baking.BAKE_TIMINGS.clear()
     tex_paths, stats = baking.bake_asset(baked, ctx.texture_size, ctx.name, ctx.work_dir, ctx.cfg, ao_dist)
-    log.info(f"optimize timings: clean {t_clean:.1f}s uv {t_uv:.1f}s uv_stats {t_stats:.1f}s "
+    log.info(f"optimize timings: clean {t_clean:.1f}s uv+stats {t_uv:.1f}s "
              f"bake {time.time() - t2:.1f}s {dict(baking.BAKE_TIMINGS)}")
     ctx.texture_paths = tex_paths
     mat = baking.build_final_material(f"M_{ctx.name}", tex_paths["base_color"], tex_paths["orm"], tex_paths["normal"],
@@ -371,7 +381,9 @@ def expectations(ctx, kind="main"):
 def stage_post_validate(ctx):
     from validators import glb_inspector
     issues = []
-    rep = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, ctx.record.model), expectations(ctx, "main"))
+    exp_main = expectations(ctx, "main")
+    ctx.record.expectations[ctx.record.model] = exp_main
+    rep = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, ctx.record.model), exp_main)
     for e in rep.errors:
         issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(ctx.record.model)}: {e['message']}"))
     for w in rep.warnings:
@@ -390,8 +402,10 @@ def stage_post_validate(ctx):
     full = os.path.join(paths.REPO_ROOT, ctx.record.model)
     ctx.record.file_size = os.path.getsize(full)
     ctx.record.sha256 = _sha256(full)
+    exp_lod = expectations(ctx, "lod")
     for lod in ctx.record.lods:
-        r = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, lod["model"]), expectations(ctx, "lod"))
+        ctx.record.expectations[lod["model"]] = exp_lod
+        r = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, lod["model"]), exp_lod)
         for e in r.errors:
             issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(lod['model'])}: {e['message']}"))
         lod["sha256"] = _sha256(os.path.join(paths.REPO_ROOT, lod["model"]))
@@ -406,7 +420,9 @@ def stage_post_validate(ctx):
         lod["triangles"] = exported
     ctx.record.lod_triangles = [lod["triangles"] for lod in ctx.record.lods]
     if ctx.record.collision:
-        r = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, ctx.record.collision), expectations(ctx, "collision"))
+        exp_col = expectations(ctx, "collision")
+        ctx.record.expectations[ctx.record.collision] = exp_col
+        r = glb_inspector.inspect(os.path.join(paths.REPO_ROOT, ctx.record.collision), exp_col)
         for e in r.errors:
             issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(ctx.record.collision)}: {e['message']}"))
         names = r.stats.get("node_names", [])
@@ -424,6 +440,7 @@ def stage_post_validate(ctx):
                    "grips": spec["grips"], "origin": "any", "max_materials": 0, "allow_no_material": True,
                    "required_nodes": base["required_nodes"][:1]}
             full_clip = os.path.join(paths.REPO_ROOT, rel)
+            ctx.record.expectations[rel] = exp
             r = glb_inspector.inspect(full_clip, exp)
             for e in r.errors:
                 issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(rel)}: {e['message']}"))

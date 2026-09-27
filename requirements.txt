@@ -1,0 +1,3 @@
+# Pinned Python dependencies for the standalone tools (tools/validate_assets.py).
+# numpy matches the version bundled with the pinned Blender 4.5 LTS.
+numpy==1.26.4

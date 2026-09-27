@@ -33,15 +33,17 @@
     "equipment": {"prefix": "eqp_", "output_dir": "props", "dimensions_m": {"min": [0.05, 0.05, 0.05], "max": [0.8, 0.8, 1.0]}}
   },
   "budgets": {
-    "tiny_prop":      {"triangles": [150, 2000],    "texture": 256,  "file_size_mb": 1.5, "lods": []},
-    "prop":           {"triangles": [400, 8000],    "texture": 512,  "file_size_mb": 3.0, "lods": [0.5]},
-    "important_prop": {"triangles": [1500, 15000],  "texture": 1024, "file_size_mb": 6.0, "lods": [0.5, 0.25]},
-    "hero_machinery": {"triangles": [5000, 25000],  "texture": 1024, "file_size_mb": 10.0, "lods": [0.5, 0.25, 0.12]},
-    "background_npc": {"triangles": [4000, 12000],  "texture": 512,  "file_size_mb": 6.0, "lods": [0.5]},
-    "worker":         {"triangles": [8000, 30000],  "texture": 1024, "file_size_mb": 12.0, "lods": [0.5, 0.25]},
-    "hero_character": {"triangles": [18000, 50000], "texture": 2048, "file_size_mb": 20.0, "lods": [0.5, 0.25, 0.12]}
+    "tiny_prop":      {"triangles": [500, 2000],    "texture": 256,  "file_size_mb": 1.5, "lods": []},
+    "prop":           {"triangles": [2000, 8000],   "texture": 512,  "file_size_mb": 3.0, "lods": [0.5]},
+    "important_prop": {"triangles": [5000, 15000],  "texture": 1024, "file_size_mb": 6.0, "lods": [0.5, 0.25]},
+    "hero_machinery": {"triangles": [8000, 25000],  "texture": 1024, "file_size_mb": 10.0, "lods": [0.5, 0.25, 0.12]},
+    "large_structure": {"triangles": [3000, 25000], "texture": 1024, "file_size_mb": 10.0, "lods": [0.5, 0.25, 0.12]},
+    "background_npc": {"triangles": [5000, 12000],  "texture": 512,  "file_size_mb": 6.0, "lods": [0.5]},
+    "worker":         {"triangles": [10000, 30000], "texture": 1024, "file_size_mb": 12.0, "lods": [0.5, 0.25]},
+    "hero_character": {"triangles": [20000, 50000], "texture": 2048, "file_size_mb": 20.0, "lods": [0.5, 0.25, 0.12]}
   },
   "budget_policy": {
+    "_comment": "Budget triangle ranges are the spec's mobile targets: below the minimum is a warning; above the maximum by up to max_overshoot_ratio is a warning, beyond it an error.",
     "max_overshoot_ratio": 0.15,
     "below_min": "warning"
   },
@@ -65,7 +67,7 @@
     "max_deviation_ratio": [0.012, 0.025, 0.05],
     "screen_ratio": [0.35, 0.15, 0.06],
     "min_triangles": 64,
-    "max_dropped_part_ratio": 0.12, "min_edge_ratio": 0.0015,
+    "max_dropped_part_ratio": 0.12, "min_edge_ratio": 0.0015, "min_edge_max_m": 0.008,
     "texture_scale": [0.5, 0.25, 0.25]
   },
   "collision": {

@@ -80,6 +80,7 @@ class OutputRecord:
     validated: bool = False
     checks: dict = field(default_factory=dict)
     clip_files: dict = field(default_factory=dict)
+    expectations: dict = field(default_factory=dict)       # file -> inspector expectations (re-checked standalone)
 
 
 class BuildContext:

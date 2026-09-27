@@ -22,7 +22,8 @@ def _entry(result, cfg):
         "bones": main.bones,
         "animations": list(main.animations),
         "lods": len(main.lods),
-        "lod_models": [{"level": l["level"], "model": l["model"], "triangles": l["triangles"]} for l in main.lods],
+        "lod_models": [{"level": l["level"], "model": l["model"], "triangles": l["triangles"], "sha256": l.get("sha256")}
+                       for l in main.lods],
         "collision": bool(main.collision),
         "collision_model": main.collision,
         "collision_shapes": main.collision_shapes,
@@ -85,7 +86,23 @@ def write(results, cfg, profile, partial=False):
         json.dump(manifest, fh, indent=2, sort_keys=False)
         fh.write("\n")
     _write_animation_manifest(ok, partial)
+    _write_expectations(ok, partial)
     return out, manifest
+
+
+def _write_expectations(results, partial):
+    """Per-file inspector expectations, so tools/validate_assets.py can re-run
+    the exact post-export checks on the files as they sit on disk."""
+    files = {}
+    for r in results:
+        for o in r.outputs:
+            for path, exp in o.expectations.items():
+                files[path] = {"asset": r.id, "state": o.state, "expect": exp}
+    doc = {"schema_version": 1, "files": dict(sorted(files.items()))}
+    name = "validation_expectations.partial.json" if partial else "validation_expectations.json"
+    with open(os.path.join(paths.MANIFEST_DIR, name), "w", encoding="utf-8") as fh:
+        json.dump(doc, fh, indent=1, sort_keys=True)
+        fh.write("\n")
 
 
 def _write_animation_manifest(results, partial):

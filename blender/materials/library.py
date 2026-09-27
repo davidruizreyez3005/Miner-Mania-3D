@@ -176,14 +176,20 @@ def build_stone(nb, col, scale=1.0, strata=True):
     base = color(col)
     n1 = nb.noise(nb.coord(0.9 * scale), detail=6.0, roughness=0.62)
     n2 = nb.noise(nb.coord(6.0 * scale), detail=4.0, roughness=0.55)
-    cr = nb.voronoi(nb.coord(2.2 * scale), feature="DISTANCE_TO_EDGE")
-    crack = nb.map_range(cr, 0.0, 0.035, 1.0, 0.0)
+    # Fracture lines: domain-warped fractal voronoi edges, masked by a low
+    # frequency noise so only some cracks show (no regular cell pattern).
+    warp = nb.vmath("ADD", nb.coord(2.2 * scale),
+                    nb.vmath("SCALE", nb.noise(nb.coord(1.4 * scale), detail=3.0, output="Color"), scale=0.9))
+    cr = nb.voronoi(warp, feature="DISTANCE_TO_EDGE", detail=1.5)
+    crack = nb.map_range(cr, 0.0, 0.02, 1.0, 0.0)
+    crack = nb.math("MULTIPLY", crack, nb.map_range(nb.noise(nb.coord(1.1 * scale), detail=2.0), 0.45, 0.65, 0.0, 1.0))
     col_out = nb.mix(nb.map_range(n1, 0.28, 0.72, 0.0, 1.0), _lin(base, 0.72), _lin(base, 1.15))
     if strata:
         x, y, z = nb.sep(nb.coord())
         band = nb.wave(nb.coord(), scale=1.6 * scale, direction="Z", distortion=5.0, detail=3.0)
-        col_out = nb.mix(nb.math("MULTIPLY", band, 0.35), col_out, _tint(base, color("stone_warm"), 0.6))
-    col_out = nb.mix(nb.math("MULTIPLY", crack, 0.8), col_out, _lin(base, 0.35))
+        # Darker, slightly iron-stained bands so strata read on every stone colour.
+        col_out = nb.mix(nb.math("MULTIPLY", band, 0.45), col_out, _tint(_lin(base, 0.78), color("stone_red"), 0.3))
+    col_out = nb.mix(nb.math("MULTIPLY", crack, 0.6), col_out, _lin(base, 0.42))
     up = nb.map_range(nb.up_facing(), 0.55, 0.95, 0.0, 0.45)
     col_out = nb.mix(up, col_out, _tint(_lin(base, 1.1), color("sand"), 0.45))
     _, grime_m = _wear_masks(nb, 0.0, 0.5, scale)
@@ -238,13 +244,17 @@ def build_precious(nb, col, rough=0.28):
     nb.surface(col_out, nb.map_range(n, 0.3, 0.7, rough - 0.08, rough + 0.12), 1.0, nb.bump(n, 0.35, 0.01))
 
 
-def build_crystal(nb, col):
+def build_crystal(nb, col, glow=None):
     base = color(col)
     x, y, z = nb.sep(nb.coord())
     grad = nb.map_range(z, 0.0, 0.6, 0.0, 1.0)
     col_out = nb.mix(grad, _lin(base, 0.45), _tint(base, (1.0, 1.0, 1.0), 0.25))
     n = nb.noise(nb.coord(8.0), detail=2.0)
-    nb.surface(col_out, nb.map_range(n, 0.3, 0.7, 0.05, 0.18), 0.0, nb.bump(n, 0.08, 0.01), specular=0.9)
+    emission = None
+    if glow is not None:
+        emission = nb.mix(grad, _lin(color(glow), 0.35), color(glow))
+    nb.surface(col_out, nb.map_range(n, 0.3, 0.7, 0.05, 0.18), 0.0, nb.bump(n, 0.08, 0.01), specular=0.9,
+               emission=emission, emission_strength=1.0 if glow is not None else None)
 
 
 def build_fabric(nb, col, weave=160.0, rough=0.9):
@@ -396,6 +406,8 @@ FIXED = {
     "crystal_amethyst": ("crystal", lambda nb: build_crystal(nb, "amethyst")),
     "crystal_diamond": ("crystal", lambda nb: build_crystal(nb, "diamond")),
     "crystal_uranium": ("crystal", lambda nb: build_crystal(nb, "uranium")),
+    "crystal_uranium_glow": ("crystal", lambda nb: build_crystal(nb, "uranium", glow="emissive_uranium")),
+    "crystal_amethyst_glow": ("crystal", lambda nb: build_crystal(nb, "amethyst", glow="emissive_crystal")),
     "reflective": ("reflective", lambda nb: build_reflective(nb, None)),
     "hazard": ("paint", lambda nb: build_paint(nb, "industrial_yellow", wear=0.4, stripes=("industrial_yellow", "hazard_black", 0.22))),
     "rubber_sole": ("rubber", lambda nb: build_rubber(nb, "rubber_sole")),

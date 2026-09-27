@@ -258,7 +258,10 @@ def build(ctx, parts, final_objs):
         if current > target:
             r = target / float(current)
             for o in objs:
-                decimate(o, r, min_edge=lcfg.get("min_edge_ratio", 0.0015) * diag)
+                # Sliver collapse scales with the asset but is capped, so thin
+                # members (ropes, rails, wires) of large structures survive.
+                min_edge = min(lcfg.get("min_edge_ratio", 0.0015) * diag, lcfg.get("min_edge_max_m", 0.008))
+                decimate(o, r, min_edge=min_edge)
                 if ctx.character is None:
                     _reshade(o)
                 if ctx.armature is not None and o.vertex_groups:

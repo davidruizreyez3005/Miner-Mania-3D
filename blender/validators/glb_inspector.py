@@ -352,7 +352,7 @@ def inspect(path_or_glb, expect=None):
     kind: 'static'|'skinned'; animations: [names]; loop: {name: bool};
     skeleton: [bone names]; skeleton_parents: {bone: parent};
     triangles: [min, max]; max_file_mb; dims_min/dims_max (Blender xyz meters);
-    origin: 'base'|'grip'|'center'|'embedded'|'any'; max_texture; max_materials;
+    origin: 'base'|'grip'|'center'|'embedded'|'tile'|'ceiling'|'any'; max_texture; max_materials;
     required_nodes: [names]; clips: {name: {...clip spec...}}; grips: {...};
     anim_cfg: pipeline animation thresholds; collision: True for collision files.
     """
@@ -674,7 +674,7 @@ def _inspect(glb, expect, rep):
             rep.err("DIMENSIONS_TOO_LARGE", f"dimensions {rep.stats['dimensions']} exceed maximum {dmax}")
         origin = expect.get("origin", "any")
         size = max(float(dims.max()), 1e-6)
-        if origin in ("base", "embedded"):
+        if origin in ("base", "embedded", "ceiling", "tile"):
             inside_xy = (bl_lo[0] - 0.05 * size <= 0.0 <= bl_hi[0] + 0.05 * size and
                          bl_lo[1] - 0.05 * size <= 0.0 <= bl_hi[1] + 0.05 * size)
             if not inside_xy:
@@ -683,6 +683,10 @@ def _inspect(glb, expect, rep):
                 rep.err("ORIGIN_NOT_ON_GROUND", f"lowest point z={bl_lo[2]:.3f} (origin must be at the base)")
             if origin == "embedded" and not (-0.4 * dims[2] <= bl_lo[2] <= 0.01):
                 rep.err("ORIGIN_EMBED", f"embedded asset base z={bl_lo[2]:.3f} outside allowed range")
+            if origin == "tile" and not (-0.5 <= bl_lo[2] <= 0.01):
+                rep.err("ORIGIN_TILE", f"tile skirt bottom z={bl_lo[2]:.3f} outside allowed range")
+            if origin == "ceiling" and abs(bl_hi[2]) > max(0.02, 0.02 * dims[2]):
+                rep.err("ORIGIN_NOT_ON_CEILING", f"highest point z={bl_hi[2]:.3f} (origin must be at the mount)")
         elif origin == "center":
             c = (bl_lo + bl_hi) / 2
             if np.linalg.norm(c) > 0.1 * size + 0.02:

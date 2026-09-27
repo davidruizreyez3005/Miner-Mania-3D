@@ -5,7 +5,9 @@ Clip functions return, for time ``t`` in seconds, a mapping of bone name to
 location is a translation in armature space applied to the rest head, and
 rotation is a Quaternion in armature space about the bone head. This keeps
 machine authoring in intuitive world axes while writing correct pose-space
-keys for any bone roll.
+keys for any bone roll. An optional third element is a scale in the bone's
+own frame (Y = along the bone), used for leaf bones such as hoist ropes that
+lengthen and shorten.
 """
 
 import numpy as np
@@ -49,13 +51,20 @@ def bake_clips(ctx):
         act, slot, bag = keys.new_action(clip.name, arm)
         for b in animated:
             rest = bones[b].matrix_local
-            locs, quats = [], []
+            locs, quats, scales = [], [], []
             for s in samples:
-                loc, rot = s.get(b, (None, None))
+                entry = tuple(s.get(b, (None, None)))
+                loc, rot = entry[0], entry[1]
+                scl = entry[2] if len(entry) > 2 and entry[2] is not None else (1.0, 1.0, 1.0)
                 t_local, q_local = _pose_basis(rest, loc, rot)
                 locs.append(tuple(t_local))
                 quats.append((q_local.w, q_local.x, q_local.y, q_local.z))
-            keys.write_bone(bag, b, frames, locs=np.array(locs), quats=np.array(quats))
+                scales.append(tuple(scl))
+            scaled = any(abs(c - 1.0) > 1e-9 for sc in scales for c in sc)
+            if scaled and bones[b].children:
+                raise PipelineError(f"clip {clip.name}: only leaf bones may scale ('{b}' has children)")
+            keys.write_bone(bag, b, frames, locs=np.array(locs), quats=np.array(quats),
+                            scales=np.array(scales) if scaled else None)
         keys.finalize_action(act, n)
         if first is None:
             first = (act, slot)

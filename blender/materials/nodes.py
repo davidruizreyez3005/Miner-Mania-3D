@@ -185,7 +185,7 @@ class NB:
         return n.outputs["Color"]
 
     # -- textures -------------------------------------------------------------
-    def noise(self, vec, scale=1.0, detail=2.0, roughness=0.5, distortion=0.0, ntype="FBM", lacunarity=2.0):
+    def noise(self, vec, scale=1.0, detail=2.0, roughness=0.5, distortion=0.0, ntype="FBM", lacunarity=2.0, output="Fac"):
         n = self.new("ShaderNodeTexNoise", noise_dimensions="3D", noise_type=ntype, normalize=True)
         self._set(n.inputs["Vector"], vec)
         n.inputs["Scale"].default_value = scale
@@ -193,7 +193,7 @@ class NB:
         n.inputs["Roughness"].default_value = roughness
         n.inputs["Lacunarity"].default_value = lacunarity
         n.inputs["Distortion"].default_value = distortion
-        return n.outputs["Fac"]
+        return n.outputs[output]
 
     def voronoi(self, vec, scale=1.0, feature="F1", randomness=1.0, output="Distance", detail=0.0):
         n = self.new("ShaderNodeTexVoronoi", voronoi_dimensions="3D", feature=feature, distance="EUCLIDEAN")

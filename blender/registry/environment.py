@@ -1,3 +1,103 @@
-"""environment asset definitions."""
+"""Environment asset definitions: natural pieces (rocks, cliffs, piles, terrain
+tiles, vegetation) and modular mine structures (supports, tunnels, rails,
+pipes, cables, signs, lamps, fences, barriers, containers, access)."""
 
-ASSETS = []
+from core.definitions import EnvironmentDefinition as E
+
+N = "environment.natural"
+S = "environment.structures"
+SUNK = {"origin": "embedded"}
+
+ASSETS = [
+    # -- rocks / cliffs / piles
+    E(id="env_rock_small_01", generator=N, seed=3001, budget="tiny_prop",
+      params={"kind": "rock", "size": (0.55, 0.45, 0.35), "material": "stone:stone_gray", "facets": 6, **SUNK},
+      tags=("rock", "scatter"), description="Small fractured rock for scattering"),
+    E(id="env_rock_medium_01", generator=N, seed=3002, budget="prop",
+      params={"kind": "rock", "size": (1.2, 1.0, 0.8), "material": "stone:stone_warm", "companions": 2, **SUNK},
+      tags=("rock",), description="Medium rock with two companion stones"),
+    E(id="env_rock_large_01", generator=N, seed=3003, budget="important_prop",
+      params={"kind": "rock", "size": (2.2, 1.9, 1.5), "material": "stone:stone_gray", "facets": 8, "companions": 3, **SUNK},
+      tags=("rock",), description="Large rock cluster"),
+    E(id="env_boulder_01", generator=N, seed=3004, budget="important_prop",
+      params={"kind": "rock", "size": (3.2, 2.8, 2.4), "material": "stone:stone_dark", "facets": 9, **SUNK},
+      tags=("rock",), description="Boulder"),
+    E(id="env_cliff_01", generator=N, seed=3005, budget="large_structure",
+      params={"kind": "cliff", "size": (6.0, 2.2, 4.5), "material": "stone:stone_warm", **SUNK},
+      tags=("rock", "modular"), description="Modular strata cliff section (tiles along X)"),
+    E(id="env_pile_gravel_01", generator=N, seed=3006, budget="prop",
+      params={"kind": "pile", "radius": 1.4, "height": 0.9, "material": "gravel:gravel", **SUNK},
+      tags=("pile",), description="Gravel stockpile"),
+    E(id="env_pile_coal_01", generator=N, seed=3007, budget="prop",
+      params={"kind": "pile", "radius": 1.2, "height": 0.8, "material": "coal", "fragment_material": "coal", **SUNK},
+      tags=("pile",), description="Coal stockpile"),
+    # -- terrain tiles (4 x 4 m, seams exact)
+    E(id="env_terrain_flat_01", generator=N, seed=3011, budget="prop", texture_size=1024,
+      params={"kind": "terrain", "material": "gravel:gravel", "origin": "tile"},
+      tags=("terrain", "modular"), description="Flat 4 m gravel ground tile"),
+    E(id="env_terrain_ramp_01", generator=N, seed=3012, budget="prop", texture_size=1024,
+      params={"kind": "terrain", "material": "soil:soil", "rise": 1.0, "origin": "tile"},
+      tags=("terrain", "modular"), description="4 m ramp tile rising 1 m toward +Y"),
+    E(id="env_terrain_mound_01", generator=N, seed=3013, budget="prop", texture_size=1024,
+      params={"kind": "terrain", "material": "soil:soil", "mound": 0.6, "origin": "tile"},
+      tags=("terrain", "modular"), description="4 m tile with a central mound"),
+    # -- vegetation
+    E(id="env_tree_pine_01", generator=N, seed=3021, budget="tiny_prop", texture_size=512,
+      params={"kind": "pine", "height": 6.0}, tags=("vegetation",), description="Stylised pine tree"),
+    E(id="env_tree_dead_01", generator=N, seed=3022, budget="tiny_prop",
+      params={"kind": "dead_tree", "height": 4.5}, tags=("vegetation",), description="Dead tree"),
+    E(id="env_bush_01", generator=N, seed=3023, budget="prop", collision="none",
+      params={"kind": "bush", "radius": 0.7, **SUNK}, tags=("vegetation", "walkthrough"), description="Bush (no collision)"),
+    E(id="env_grass_clump_01", generator=N, seed=3024, budget="tiny_prop", collision="none",
+      params={"kind": "grass", "radius": 0.35}, tags=("vegetation", "walkthrough"), description="Dry grass clump (no collision)"),
+    # -- supports / tunnel
+    E(id="env_support_wood_01", generator=S, seed=3101, budget="tiny_prop", texture_size=512,
+      params={"kind": "support_wood"}, tags=("mine", "modular"), description="Timber mine set, chains every 1 m"),
+    E(id="env_support_steel_01", generator=S, seed=3102, budget="tiny_prop", texture_size=512,
+      params={"kind": "support_steel"}, tags=("mine",), description="Steel arch set"),
+    E(id="env_tunnel_straight_01", generator=S, seed=3103, budget="prop", texture_size=1024,
+      params={"kind": "tunnel", **SUNK}, tags=("mine", "modular"), description="4 m tunnel segment, chains along Y"),
+    # -- rails (600 mm gauge)
+    E(id="env_rail_straight_01", generator=S, seed=3111, budget="tiny_prop",
+      params={"kind": "rail_straight", "length": 2.0}, tags=("rail", "modular"), description="2 m straight track"),
+    E(id="env_rail_curve_01", generator=S, seed=3112, budget="tiny_prop",
+      params={"kind": "rail_curve", "radius": 6.0, "angle": 22.5}, tags=("rail", "modular"),
+      description="22.5 degree curve, 6 m radius"),
+    E(id="env_rail_buffer_01", generator=S, seed=3113, budget="tiny_prop",
+      params={"kind": "rail_buffer"}, tags=("rail",), description="Track end buffer stop"),
+    # -- pipes / cables
+    E(id="env_pipe_straight_01", generator=S, seed=3121, budget="tiny_prop",
+      params={"kind": "pipe_straight"}, tags=("pipe", "modular"), description="3 m pipe on stands"),
+    E(id="env_pipe_elbow_01", generator=S, seed=3122, budget="tiny_prop",
+      params={"kind": "pipe_elbow"}, tags=("pipe", "modular"), description="90 degree pipe elbow"),
+    E(id="env_pipe_valve_01", generator=S, seed=3123, budget="prop",
+      params={"kind": "pipe_valve"}, tags=("pipe", "modular", "interactive"), description="Pipe section with a gate valve"),
+    E(id="env_cable_reel_01", generator=S, seed=3124, budget="tiny_prop",
+      params={"kind": "cable_reel"}, tags=("cable",), description="Cable drum"),
+    E(id="env_cable_tray_01", generator=S, seed=3125, budget="tiny_prop",
+      params={"kind": "cable_tray"}, tags=("cable", "modular"), description="3 m cable tray run"),
+    # -- signs / lamps
+    E(id="env_sign_warning_01", generator=S, seed=3131, budget="tiny_prop",
+      params={"kind": "sign_warning"}, tags=("sign",), description="Warning sign post"),
+    E(id="env_sign_direction_01", generator=S, seed=3132, budget="tiny_prop",
+      params={"kind": "sign_direction"}, tags=("sign",), description="Direction sign post"),
+    E(id="env_lamp_post_01", generator=S, seed=3133, budget="tiny_prop",
+      params={"kind": "lamp_post"}, tags=("light",), description="Floodlight mast"),
+    E(id="env_lamp_hanging_01", generator=S, seed=3134, budget="tiny_prop",
+      params={"kind": "lamp_hanging", "origin": "ceiling"}, tags=("light", "mine"), description="Hanging tunnel lamp"),
+    # -- fences / barriers / containers / access
+    E(id="env_fence_01", generator=S, seed=3141, budget="tiny_prop",
+      params={"kind": "fence"}, tags=("fence", "modular"), description="3 m mesh fence panel"),
+    E(id="env_barrier_01", generator=S, seed=3142, budget="tiny_prop",
+      params={"kind": "barrier"}, tags=("barrier", "modular"), description="2 m concrete road barrier"),
+    E(id="env_container_01", generator=S, seed=3143, budget="important_prop",
+      params={"kind": "container", "color": "machine_blue"}, tags=("container",), description="20 ft shipping container, blue"),
+    E(id="env_container_02", generator=S, seed=3144, budget="important_prop",
+      params={"kind": "container", "color": "signal_red"}, tags=("container",), description="20 ft shipping container, red"),
+    E(id="env_scaffold_01", generator=S, seed=3151, budget="prop",
+      params={"kind": "scaffold"}, tags=("access",), description="Scaffold tower with platform and ladder"),
+    E(id="env_catwalk_01", generator=S, seed=3152, budget="prop",
+      params={"kind": "catwalk"}, tags=("access", "modular"), description="4 m elevated catwalk"),
+    E(id="env_water_tank_01", generator=S, seed=3153, budget="important_prop",
+      params={"kind": "water_tank"}, tags=("utility",), description="Elevated water tank"),
+]

@@ -91,7 +91,9 @@ def origin_policy(ctx):
     pol = ctx.param("origin")
     if pol:
         return pol
-    return {"tool": "grip", "equipment": "any"}.get(ctx.defn.category, "base")
+    # Resource nodes sit sunk ~5 cm into the ground plane (their origin) so
+    # they never float on uneven terrain: footprint checked, no base contact.
+    return {"tool": "grip", "equipment": "any", "resource": "embedded"}.get(ctx.defn.category, "base")
 
 
 def validate_scale(ctx, lo, hi):
@@ -110,13 +112,17 @@ def validate_scale(ctx, lo, hi):
                 issues.append(ValidationIssue("error", "SCALE_UNEXPECTED", f"{axis} size {d:.3f} m outside expected [{mn}, {mx}]"))
     pol = origin_policy(ctx)
     size = max(dims)
-    if pol in ("base", "embedded"):
+    if pol in ("base", "embedded", "ceiling", "tile"):
         if not (lo[0] - 0.05 * size <= 0 <= hi[0] + 0.05 * size and lo[1] - 0.05 * size <= 0 <= hi[1] + 0.05 * size):
             issues.append(ValidationIssue("error", "ORIGIN_OFF_FOOTPRINT", "origin is outside the asset footprint"))
         if pol == "base" and abs(lo[2]) > max(0.02, 0.02 * dims[2]):
             issues.append(ValidationIssue("error", "ORIGIN_NOT_ON_GROUND", f"lowest point z={lo[2]:.3f}; origin must be at the base"))
         if pol == "embedded" and not (-0.4 * dims[2] <= lo[2] <= 0.01):
             issues.append(ValidationIssue("error", "ORIGIN_EMBED", f"embedded base z={lo[2]:.3f} out of range"))
+        if pol == "tile" and not (-0.5 <= lo[2] <= 0.01):
+            issues.append(ValidationIssue("error", "ORIGIN_TILE", f"tile skirt bottom z={lo[2]:.3f} out of range"))
+        if pol == "ceiling" and abs(hi[2]) > max(0.02, 0.02 * dims[2]):
+            issues.append(ValidationIssue("error", "ORIGIN_NOT_ON_CEILING", f"highest point z={hi[2]:.3f}; origin must be at the mount"))
     elif pol == "grip":
         if not all(lo[i] <= 0.02 and hi[i] >= -0.02 for i in range(3)):
             issues.append(ValidationIssue("error", "ORIGIN_GRIP", "tool origin (grip) lies outside the tool"))
