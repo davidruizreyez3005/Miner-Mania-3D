@@ -70,4 +70,11 @@ ASSETS = [
       outfit="supervisor", outfit_colors={"shirt": "shirt_blue", "tie": "denim_dark"}, helmet="hardhat",
       helmet_color="white_paint", gloves="none", equipment=("radio",), off_hand_tool="tool_tablet_01",
       description="Supervisor with tablet"),
+    # Automated test character: rigid mannequin carrying the whole library.
+    MannequinDefinition(id="chr_mannequin_test_01", seed=1090, budget="background_npc", texture_size=256, lods=(),
+                        tags=("test",), description="Test mannequin on humanoid_worker_v1 exercising every worker clip"),
+    # Shared animation library (+ one GLB per clip) on the same skeleton.
+    AnimationLibraryDefinition(id="anim_worker_library", seed=1091, budget="background_npc", texture_size=256,
+                               lods=(), collision="none", tags=("animation",),
+                               description="Worker animation library: all clips, plus anim_worker_<clip>.glb files"),
 ]

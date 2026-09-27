@@ -41,6 +41,8 @@ def _entry(result, cfg):
         "uv": main.uv,
         "validated": all(o.validated for o in outs),
     }
+    if main.clip_files:
+        entry["clip_models"] = dict(main.clip_files)
     if len(d.states) > 1 or d.states[0] != "default":
         entry["states"] = {
             o.state: {"model": o.model, "triangles": o.triangles, "lod_models": [l["model"] for l in o.lods],
@@ -114,6 +116,8 @@ def _write_animation_manifest(results, partial):
             "optional": bool(c.get("optional")),
             "measured": {k: v for k, v in det.items() if k in ("foot_slide_m", "grip_error_m", "contact_frames")},
         }
+        if source.outputs[0].clip_files.get(name):
+            clips[name]["model"] = source.outputs[0].clip_files[name]
     doc = {
         "skeleton": spec["skeleton"],
         "library_model": source.outputs[0].model,

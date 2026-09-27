@@ -79,6 +79,7 @@ class OutputRecord:
     sockets: list = field(default_factory=list)
     validated: bool = False
     checks: dict = field(default_factory=dict)
+    clip_files: dict = field(default_factory=dict)
 
 
 class BuildContext:

@@ -140,6 +140,11 @@ def build(ctx, parts, final_objs):
             r = target / float(current)
             for o in objs:
                 decimate(o, r)
+                if ctx.armature is not None and o.vertex_groups:
+                    # Collapses interpolate weights: re-limit influences.
+                    from rigging.worker_rig import clean_weights
+                    dcfg = ctx.cfg["deformation"]
+                    clean_weights(o, dcfg["max_influences"], dcfg["min_weight"])
         tris = _tris(objs)
         if tris > target * 1.25:
             ctx.warn("LOD_TRIANGLE_TARGET_MISSED", f"LOD{level} has {tris} tris (target {target})")

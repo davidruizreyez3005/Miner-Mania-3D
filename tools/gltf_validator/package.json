@@ -1,0 +1,16 @@
+{
+  "name": "miner-mania-gltf-validation",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Runs the official Khronos glTF-Validator over every generated asset listed in assets/manifests/asset_manifest.json.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "validate": "node validate.mjs"
+  },
+  "dependencies": {
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}

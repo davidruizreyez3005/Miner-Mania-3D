@@ -34,7 +34,10 @@ def clean_weights(obj, max_influences=4, min_weight=0.01, allowed=None):
 
 def finalize(ctx):
     sk = human_rig.skeleton()
-    arm = armature_utils.create_armature(ctx.name, sk.specs)
+    # Every humanoid shares the armature (root node) name, so Godot's imported
+    # track paths are identical across workers, the mannequin and the
+    # anim_worker_* libraries: one AnimationLibrary drives them all.
+    arm = armature_utils.create_armature(human_rig.NAME, sk.specs)
     ctx.armature = arm
     allowed = set(sk.deform_bones)
     for o in ctx.objects:

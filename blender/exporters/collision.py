@@ -85,7 +85,9 @@ def build(ctx):
             pts = [Vector(p) for p in spec.points]
         else:
             raise PipelineError(f"unknown collision kind {spec.kind}")
-        objs.append(hull_object(name, pts))
+        obj = hull_object(name, pts)
+        obj["mm_col_kind"] = spec.kind
+        objs.append(obj)
     return objs
 
 
@@ -130,8 +132,12 @@ def validate(ctx, objs, render_lo, render_hi):
             issues.append(ValidationIssue("error", "COLLISION_NOT_CONVEX", f"{o.name}: {worst * 1000:.1f} mm outside"))
         if o.matrix_world != o.matrix_world.Identity(4):
             issues.append(ValidationIssue("error", "COLLISION_TRANSFORM", f"{o.name}: collision must have identity transform"))
+        # Character capsules are standard gameplay controllers (config
+        # collision.character_capsule), not fitted shells: only their height
+        # must stay within the body; a slim body may be narrower than them.
+        axes = (2,) if o.get("mm_col_kind") == "capsule" else (0, 1, 2)
         for v in co:
-            if any(v[i] < render_lo[i] - tol or v[i] > render_hi[i] + tol for i in range(3)):
+            if any(v[i] < render_lo[i] - tol or v[i] > render_hi[i] + tol for i in axes):
                 issues.append(ValidationIssue("error", "COLLISION_OUT_OF_BOUNDS",
                                               f"{o.name}: vertex {tuple(round(x, 3) for x in v)} outside render bounds"))
                 break

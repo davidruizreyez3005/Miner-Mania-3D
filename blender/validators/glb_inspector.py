@@ -513,8 +513,20 @@ def _inspect(glb, expect, rep):
                 rep.err("POSITION_BOUNDS", f"POSITION accessor {attrs['POSITION']} lacks min/max")
             if "NORMAL" not in attrs:
                 rep.err("NO_NORMALS", f"mesh {n['mesh']} prim {j} has no normals")
+            else:
+                nrm = glb.accessor(attrs["NORMAL"])
+                if len(nrm) and np.abs(np.linalg.norm(nrm, axis=1) - 1.0).max() > 0.01:
+                    rep.err("NORMAL_NOT_UNIT", f"mesh {n['mesh']} prim {j} has non-unit normals")
             mat = js["materials"][p["material"]] if "material" in p else {}
             textured = "baseColorTexture" in mat.get("pbrMetallicRoughness", {}) or "normalTexture" in mat
+            if "normalTexture" in mat and "TANGENT" not in attrs:
+                rep.err("NO_TANGENTS", f"normal-mapped primitive (mesh {n['mesh']} prim {j}) has no TANGENT")
+            if "TANGENT" in attrs:
+                tan = glb.accessor(attrs["TANGENT"])
+                bad = np.abs(np.linalg.norm(tan[:, :3], axis=1) - 1.0) > 0.01
+                if bad.any() or not np.all(np.isin(np.round(tan[:, 3]), (-1.0, 1.0))):
+                    rep.err("TANGENT_INVALID", f"mesh {n['mesh']} prim {j}: {int(bad.sum())} non-unit tangents "
+                                               f"or invalid handedness")
             if textured and "TEXCOORD_0" not in attrs:
                 rep.err("NO_UV", f"textured primitive (mesh {n['mesh']} prim {j}) has no TEXCOORD_0")
             if textured and "TEXCOORD_0" in attrs:
@@ -608,6 +620,11 @@ def _inspect(glb, expect, rep):
         rep.stats["bind_pose_error"] = round(worst, 6)
         if worst > 1e-3:
             rep.err("BIND_POSE_MISMATCH", f"skin {si}: rest pose differs from bind pose (max err {worst:.4f})")
+    # glTF ignores a skinned mesh node's (inherited) transform; engines differ
+    # in how strictly they follow that, so require identity to be unambiguous.
+    for ni in skinned_nodes:
+        if float(np.abs(world[ni] - np.eye(4)).max()) > 1e-5:
+            rep.err("SKINNED_MESH_TRANSFORM", f"skinned mesh node {nodes[ni].get('name')} has a non-identity world transform")
     if expect.get("kind") == "skinned" and not js.get("skins"):
         rep.err("NO_SKIN", "asset is expected to be skinned but has no skin")
     if expect.get("skeleton"):
@@ -818,9 +835,11 @@ def _check_contacts(nm, spec, times, frames_world, name_to_idx, acfg, rep, info)
     if rm.get("type") == "in_place":
         speed = float(rm.get("speed_mps", 0.0))
     thr = acfg.get("foot_contact_height_m", 0.045)
+    thr_v = acfg.get("foot_contact_speed_mps", 0.3)
     max_slide = acfg.get("foot_slide_max_m", 0.035)
     worst = 0.0
     contact_frames = 0
+    ground_v = np.array([0.0, speed])
     for side in ("L", "R"):
         idx = name_to_idx.get(f"toe.{side}")
         if idx is None:
@@ -828,7 +847,13 @@ def _check_contacts(nm, spec, times, frames_world, name_to_idx, acfg, rep, info)
             return
         pos = np.array([_gltf_to_bl(fw[idx][:3, 3]) for fw in frames_world])
         rest_h = pos[:, 2].min()
-        contact = pos[:, 2] <= max(rest_h, 0.0) + thr
+        # A foot is in contact when it is near the ground AND moving with it
+        # (horizontal speed relative to the ground below thr_v); low, fast
+        # swing frames are not contacts. Slow slides accumulate over the
+        # contact span and are caught by max_slide below.
+        vel = np.gradient(pos[:, :2], times, axis=0) if len(times) > 2 else np.zeros((len(times), 2))
+        rel_speed = np.linalg.norm(vel - ground_v, axis=1)
+        contact = (pos[:, 2] <= max(rest_h, 0.0) + thr) & (rel_speed <= thr_v)
         contact_frames += int(contact.sum())
         # Expected ground motion in character space: the worker faces -Y and moves forward,
         # so planted feet travel toward +Y at `speed`.

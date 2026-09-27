@@ -7,8 +7,8 @@ assets/source/animation_clips.json ``grips``), so every compatible tool works
 with the shared animation library:
 
 * pickaxe / sledgehammer: left hand 0.30 m down the handle (z = -0.30)
-* shovel: left hand on the D-grip end (z = -0.40), opposite palm
-* jackhammer: T-bar along Z, left grip at z = +0.36, body hangs along -X
+* shovel: left hand high on the shaft next to the D-grip (z = -0.34)
+* jackhammer: T-bar along Z, left grip at z = +0.36, body hangs along +X
 
 Exported tool GLBs keep this origin/orientation, so in Godot a tool attaches to
 the ``hand_tool.R`` BoneAttachment3D with an identity transform.
@@ -83,27 +83,29 @@ def rock_hammer(g, d):
 
 
 def shovel(g, d):
-    _handle(g, -0.56, 0.37, 0.018, 0.018)
+    # Main grip mid-shaft, 0.93 m from the blade tip; left hand at z=-0.34.
+    _handle(g, -0.36, 0.57, 0.018, 0.018)
     # D-grip at the handle end.
-    dpath = [Vector((0.0, 0.0, -0.55)), Vector((0.05, 0.0, -0.6)), Vector((0.05, 0.0, -0.68)), Vector((0.0, 0.0, -0.7)),
-             Vector((-0.05, 0.0, -0.68)), Vector((-0.05, 0.0, -0.6)), Vector((0.0, 0.0, -0.55))]
+    dpath = [Vector((0.0, 0.0, -0.35)), Vector((0.05, 0.0, -0.4)), Vector((0.05, 0.0, -0.48)), Vector((0.0, 0.0, -0.5)),
+             Vector((-0.05, 0.0, -0.48)), Vector((-0.05, 0.0, -0.4)), Vector((0.0, 0.0, -0.35))]
     g.sweep(dpath, radius=0.012, segments=8, mat="plastic:plastic_black", closed_path=True, caps=False,
             up_hint=(0, 1, 0))
-    g.cylinder(0.024, 0.1, segments=12, matrix=trs((0, 0, 0.39)), mat=STEEL, radius_top=0.02, bevel=0.004)
-    # Blade: curved spade plate, concave toward -Y.
+    g.cylinder(0.024, 0.1, segments=12, matrix=trs((0, 0, 0.59)), mat=STEEL, radius_top=0.02, bevel=0.004)
+    # Blade: curved spade plate, concave toward +X -- the right hand's palm
+    # normal -- so the underhand lower grip carries the scoop face up.
     verts, faces = [], []
     nu, nv = 6, 6
     for j in range(nv + 1):
         t = j / nv
-        z = 0.43 + 0.3 * t
+        z = 0.63 + 0.3 * t
         half = 0.12 * (1.0 - 0.75 * max(0.0, t - 0.55) / 0.45) if t > 0.55 else 0.12 * (0.8 + 0.2 * t / 0.55)
         for i in range(nu + 1):
             u = -1.0 + 2.0 * i / nu
-            x = u * half
-            y = 0.03 * (u * u) - 0.012
+            y = -u * half
+            x = 0.03 * (u * u) - 0.012
             verts.append((x, y, z))
     base = len(verts)
-    verts += [(x, y + 0.004, z) for x, y, z in verts]
+    verts += [(x - 0.004, y, z) for x, y, z in verts]
     for j in range(nv):
         for i in range(nu):
             a = j * (nu + 1) + i
@@ -123,24 +125,26 @@ def shovel(g, d):
 
 
 def jackhammer(g, d):
-    # T-bar along Z: right grip at z=0, left grip at z=0.36, body center at z=0.18.
+    # T-bar along Z: right grip at z=0, left grip at z=0.36, body centred at
+    # z=0.18 and hanging along +X (the right hand's palm normal), so with both
+    # palms down on the handles the bit points at the ground 0.89 m below.
     g.cylinder(0.016, 0.46, segments=10, matrix=trs((0, 0, 0.18)), mat=STEEL, bevel=0.003)
     for z in (0.0, 0.36):
         d.cylinder(0.021, 0.1, segments=10, matrix=trs((0, 0, z)), mat="rubber", bevel=0.004)
-    body_axis = Vector((-1, 0, 0))
-    top = Vector((-0.03, 0, 0.18))
-    g.cylinder(0.048, 0.1, segments=16, matrix=frame_from_axis(top + body_axis * 0.05, body_axis),
-               mat="paint:industrial_yellow", bevel=0.008)
-    g.cylinder(0.04, 0.3, segments=16, matrix=frame_from_axis(top + body_axis * 0.25, body_axis),
+    body_axis = Vector((1, 0, 0))
+    top = Vector((0.03, 0, 0.18))
+    g.cylinder(0.056, 0.16, segments=16, matrix=frame_from_axis(top + body_axis * 0.08, body_axis),
+               mat="paint:industrial_yellow", bevel=0.01)
+    g.cylinder(0.042, 0.38, segments=16, matrix=frame_from_axis(top + body_axis * 0.35, body_axis),
                mat="metal:dark_steel", bevel=0.004)
     for i in range(5):
-        d.cylinder(0.046, 0.012, segments=16, matrix=frame_from_axis(top + body_axis * (0.14 + 0.05 * i), body_axis),
+        d.cylinder(0.048, 0.014, segments=16, matrix=frame_from_axis(top + body_axis * (0.21 + 0.06 * i), body_axis),
                    mat="steel", bevel=0.002)
-    g.cylinder(0.022, 0.05, segments=12, matrix=frame_from_axis(top + body_axis * 0.425, body_axis), mat=STEEL)
-    g.cylinder(0.012, 0.19, segments=8, matrix=frame_from_axis(top + body_axis * 0.54, body_axis), mat=BRIGHT,
+    g.cylinder(0.024, 0.06, segments=12, matrix=frame_from_axis(top + body_axis * 0.57, body_axis), mat=STEEL)
+    g.cylinder(0.013, 0.26, segments=8, matrix=frame_from_axis(top + body_axis * 0.73, body_axis), mat=BRIGHT,
                radius_top=0.003)
-    hose = [top + Vector((-0.1, 0.045, 0.02)), top + Vector((-0.14, 0.09, 0.05)), top + Vector((-0.1, 0.16, 0.1)),
-            top + Vector((0.0, 0.2, 0.12))]
+    hose = [top + Vector((0.1, 0.05, 0.03)), top + Vector((0.12, 0.1, 0.07)), top + Vector((0.06, 0.17, 0.11)),
+            top + Vector((-0.02, 0.21, 0.13))]
     d.sweep(hose, radius=0.011, segments=8, mat="rubber", up_hint=(0, 0, 1))
 
 

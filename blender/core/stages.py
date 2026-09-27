@@ -121,6 +121,16 @@ def _clean_parts(parts):
             loose = [v for v in bm.verts if not v.link_faces]
             if loose:
                 bmesh.ops.delete(bm, geom=loose, context="VERTS")
+        # Triangulate once, deterministically, before UV/bake: the normal map
+        # is baked on exactly the triangles that are exported, and the
+        # exporter can write MikkTSpace tangents (it refuses n-gons).
+        bmesh.ops.triangulate(bm, faces=list(bm.faces), quad_method="BEAUTY", ngon_method="BEAUTY")
+        # Collapse sub-0.6 mm edges: slivers from collinear n-gon corners or
+        # tiny steps carry no visible detail but get vertex normals nearly
+        # perpendicular to their face, which yields zero MikkTSpace tangents.
+        bmesh.ops.dissolve_degenerate(bm, dist=6e-4, edges=list(bm.edges))
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3], quad_method="BEAUTY",
+                              ngon_method="BEAUTY")
         bm.to_mesh(o.data)
         bm.free()
         o.data.update()
@@ -285,6 +295,14 @@ def stage_export(ctx):
         ctx.record.collision_shapes = len(ctx.collision_objects)
     ctx.record.sockets = [s.name for s in ctx.sockets]
     ctx.record.texture_resolution = ctx.texture_size
+    if ctx.defn.category == "animation" and animated:
+        from exporters import glb_split
+        from core import config
+        stem = ctx.name.replace("_library", "")
+        clips = list(config.animation_spec()["clips"])
+        files = glb_split.split(main_path, clips,
+                                lambda c: os.path.join(_out_dir(ctx), f"{stem}_{c.lower()}.glb"))
+        ctx.record.clip_files = {c: paths.rel(p) for c, p in files.items()}
 
 
 def expectations(ctx, kind="main"):
@@ -309,13 +327,14 @@ def expectations(ctx, kind="main"):
         exp["kind"] = "skinned"
         bones = [bn.name for bn in ctx.armature.data.bones]
         exp["skeleton"] = bones
-        exp["skeleton_parents"] = {bn.name: (bn.parent.name if bn.parent else ctx.name)
+        exp["skeleton_parents"] = {bn.name: (bn.parent.name if bn.parent else ctx.armature.name)
                                    for bn in ctx.armature.data.bones}
     if kind == "main":
         exp["triangles"] = [b["triangles"][0], int(b["triangles"][1] * (1 + cfg["budget_policy"]["max_overshoot_ratio"]))]
         exp["triangles_soft_max"] = b["triangles"][1]
         exp["max_file_mb"] = b["file_size_mb"]
-        exp["required_nodes"] = [ctx.name] + [f"socket_{s.name}" for s in ctx.sockets]
+        root_name = ctx.armature.name if ctx.armature is not None else ctx.name
+        exp["required_nodes"] = [root_name] + [f"socket_{s.name}" for s in ctx.sockets]
         if ctx.character is not None and ctx.character.get("animate", True):
             spec = config.animation_spec()
             exp["animations"] = config.required_clip_names()
@@ -375,6 +394,22 @@ def stage_post_validate(ctx):
             issues.append(ValidationIssue("error", "COLLISION_NAMING", f"collision nodes must end with -convcolonly: {names}"))
     elif ctx.defn.collision != "none":
         issues.append(ValidationIssue("error", "COLLISION_MISSING", "collision file missing"))
+    if ctx.record.clip_files:
+        from core import config
+        spec = config.animation_spec()
+        base = expectations(ctx, "main")
+        for clip, rel in ctx.record.clip_files.items():
+            exp = {"kind": "skinned", "skeleton": base["skeleton"], "skeleton_parents": base["skeleton_parents"],
+                   "anim_cfg": base["anim_cfg"], "animations": [clip], "clips": {clip: spec["clips"][clip]},
+                   "grips": spec["grips"], "origin": "any", "max_materials": 0, "allow_no_material": True,
+                   "required_nodes": base["required_nodes"][:1]}
+            full_clip = os.path.join(paths.REPO_ROOT, rel)
+            r = glb_inspector.inspect(full_clip, exp)
+            for e in r.errors:
+                issues.append(ValidationIssue("error", e["code"], f"{os.path.basename(rel)}: {e['message']}"))
+            if r.stats.get("animations") != [clip]:
+                issues.append(ValidationIssue("error", "CLIP_FILE_CONTENT",
+                                              f"{os.path.basename(rel)} holds {r.stats.get('animations')}, expected [{clip}]"))
     _gate(ctx, "post_validate", issues)
     ctx.record.validated = True
 
