@@ -6,9 +6,6 @@ extends Node3D
 ## when worn, loop their machine sound, and grow with level tiers (more silos,
 ## twin machines, busier yards). A collider makes the facility tappable.
 
-const TIER_LEVELS := {"silo": [1, 10, 25, 50], "conveyor": [1, 25, 100], "generator": [1, 25, 100],
-	"pump": [1, 25], "crusher": [1, 50], "washer": [1, 50], "sorter": [1, 50], "smelter": [1, 50], "refinery": [1, 50],
-	"warehouse": [1, 10, 50], "office": [1, 20], "workshop": [1], "depot": [1, 10]}
 const LOOPS := {"crusher": "crusher_loop", "washer": "hum_loop", "sorter": "conveyor_loop", "smelter": "hum_loop",
 	"refinery": "pump_loop", "generator": "generator_loop", "pump": "pump_loop", "conveyor": "conveyor_loop"}
 const GHOST_SHADER := preload("res://game/world/shaders/ghost.gdshader")
@@ -67,11 +64,7 @@ func level() -> int:
 
 
 func current_tier() -> int:
-	var t := 0
-	for lv in TIER_LEVELS.get(fid, [1]):
-		if level() >= int(lv):
-			t += 1
-	return t
+	return SiteLayout.tier_for_level(fid, level(), true)
 
 
 func _rebuild() -> void:
@@ -86,30 +79,12 @@ func _rebuild() -> void:
 	tier = current_tier()
 	if not built:
 		_build_site()
+		world.notify_facility_rebuilt()
 		return
-	match fid:
-		"silo":
-			var sp: Array = plot.get("spacing", [3.8, 0.0])
-			var counts: Array = plot.get("count_by_tier", [1, 2, 3, 4])
-			var n := int(counts[clampi(tier - 1, 0, counts.size() - 1)])
-			for i in n:
-				_add_unit(Vector3(float(sp[0]) * i, 0, float(sp[1]) * i))
-		"conveyor":
-			var seg := float(plot.get("segment", 6.77))
-			var n2 := int(plot.get("segments", 5))
-			for i in n2:
-				_add_unit(Vector3(0, 0, -seg * i))
-			if tier >= 2:
-				for i in n2:
-					_add_unit(Vector3(2.2, 0, -seg * i))
-		"depot":
-			pass                      # trucks are driven by SalesView; the depot is its yard
-		_:
-			_add_unit(Vector3.ZERO)
-			if tier >= 2 and fid in ["crusher", "washer", "sorter", "smelter", "refinery", "generator", "pump"]:
-				var b := Assets.bounds(asset_id)
-				_add_unit(Vector3(b.size.x + 1.2, 0, 0))
+	for off in SiteLayout.unit_offsets(fid, plot, asset_id, tier):
+		_add_unit(off)
 	_add_yard_dressing()
+	world.notify_facility_rebuilt()
 	if LOOPS.has(fid) and loop_player == null:
 		loop_player = Audio.attach_loop(String(LOOPS[fid]), self, Vector3(0, 1.5, 0))
 
@@ -166,20 +141,33 @@ func _build_site() -> void:
 	site.add_child(crates)
 
 
+var _yard: Node3D
+
+
 func _add_yard_dressing() -> void:
-	## Level tiers make yards visibly busier (pallets, barrels, containers).
-	if fid == "warehouse" and tier >= 2:
-		var b := Assets.bounds(asset_id)
-		var ts := []
-		for i in (4 if tier >= 3 else 2):
-			ts.append(Transform3D(Basis(Vector3.UP, 0.1 * i), Vector3(b.end.x + 1.4, 0, b.position.z + 2.0 + 1.5 * i)))
-		Scatter.place(self, "prop_pallet_01", ts, Atmosphere.LAYER_SURFACE, true, 80.0)
-		if tier >= 3:
-			var c := Assets.instantiate("env_container_02", "", true)
-			c.position = Vector3(b.end.x + 5.0, 0, b.get_center().z)
-			c.rotation_degrees.y = 90.0
-			add_child(c)
-			units.append(c)
+	## Level tiers make yards visibly busier (pallets, containers); pieces go
+	## through the module library's placement validation like all dressing.
+	var owner := "yard:" + fid
+	world.modules.release(owner)
+	if _yard:
+		_yard.queue_free()
+		_yard = null
+	if fid != "warehouse" or tier < 2:
+		return
+	_yard = Node3D.new()
+	_yard.name = "Yard"
+	world.surface_root.add_child(_yard)
+	var b := Assets.bounds(asset_id)
+	var xf := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), position)
+	for i in (4 if tier >= 3 else 2):
+		var lp := Vector3(b.end.x + 1.4, 0, b.position.z + 2.0 + 1.6 * i)
+		var t := xf * Transform3D(Basis(), lp)
+		t.origin.y = world.ground_height(t.origin.x, t.origin.z)
+		world.modules.try_place(_yard, "mod_pallet", t, "surface", 0, owner)
+	if tier >= 3:
+		var ct := xf * Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(b.end.x + 5.0, 0, b.get_center().z))
+		ct.origin.y = world.ground_height(ct.origin.x, ct.origin.z)
+		world.modules.try_place(_yard, "mod_container_red", ct, "surface", 0, owner)
 
 
 func sync(delta: float) -> void:
@@ -218,10 +206,34 @@ func sync(delta: float) -> void:
 			smoke.emitting = worn
 
 
+## Footprints agents walk around: [centre xz, half extents xz, yaw] per
+## visual unit, or the fenced construction site while unbuilt.
+func blocked_boxes() -> Array:
+	var out: Array = []
+	var b := Assets.bounds(asset_id)
+	var xf := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), position)
+	var ry := deg_to_rad(yaw)
+	if not built:
+		if fid == "depot":
+			return out
+		var c := xf * Vector3(b.get_center().x, 0, b.get_center().z)
+		out.append([Vector2(c.x, c.z), Vector2(b.size.x, b.size.z) * 0.5 + Vector2(1.2, 1.2), ry])
+		return out
+	for u in units:
+		var n := u as Node3D
+		var ub := Assets.bounds(String(n.get_meta("asset_id", asset_id)))
+		var c2 := xf * (n.position + n.basis * ub.get_center())
+		out.append([Vector2(c2.x, c2.z), Vector2(ub.size.x, ub.size.z) * 0.5 + Vector2(0.2, 0.2), ry + n.rotation.y])
+	return out
+
+
 ## Where an operator stands (world transform) - the asset's operate socket.
 func work_transform(kind: String = "operate") -> Transform3D:
 	var sock := kind if Assets.has_socket(asset_id, kind) else ("interact" if Assets.has_socket(asset_id, "interact") else "")
 	if sock != "" and not units.is_empty():
 		return (units[0] as Node3D).global_transform * Assets.socket(asset_id, sock)
+	# Layout work/repair offsets are world-space (as the simulation reads them).
 	var w: Array = plot.get("work" if kind == "operate" else "repair", [0, 2])
-	return global_transform * Transform3D(Basis(), Vector3(float(w[0]), 0, float(w[1])))
+	var base := transform if not is_inside_tree() else global_transform
+	var p := base.origin + Vector3(float(w[0]), 0, float(w[1]))
+	return Transform3D(Basis(Vector3.UP, atan2(-float(w[0]), -float(w[1]))), p)

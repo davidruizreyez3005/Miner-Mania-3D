@@ -34,6 +34,9 @@ class ErrorCapture extends Logger:
 
 
 func _initialize() -> void:
+	# World tests add nodes to the tree; the root is only inside the tree
+	# once the first frame starts.
+	await process_frame
 	var args := _args()
 	var capture := ErrorCapture.new()
 	OS.add_logger(capture)

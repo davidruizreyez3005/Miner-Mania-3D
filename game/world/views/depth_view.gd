@@ -199,6 +199,17 @@ func _build_structure() -> void:
 	cart_anim = aps[0] if not aps.is_empty() else null
 
 
+## Worker root transforms for sitting on the rest-corner bench.
+func bench_seats() -> Array:
+	var rest: Array = gal().get("rest", [-5.5, -7.2])
+	var rx := float(rest[0])
+	var t := Transform3D(Basis(), Vector3(rx, floor_at(rx), float(rest[1])))
+	if not Assets.has_socket("prop_bench_01", "seat"):
+		return []
+	var seat := t * Assets.socket("prop_bench_01", "seat")
+	return [seat * Transform3D(Basis(), Vector3(-0.4, 0, 0)), seat * Transform3D(Basis(), Vector3(0.4, 0, 0))]
+
+
 # ---------------------------------------------------------------- dressing
 
 func _build_dressing() -> void:
@@ -244,7 +255,7 @@ func _build_dressing() -> void:
 			"lamp_post":
 				world.modules.place_many(self, "mod_lamp_post", [Transform3D(Basis(), Vector3(-1.0, floor_at(-1.0), -7.9))], "gallery", d)
 			"barriers":
-				world.modules.place_many(self, "mod_barrier", [Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(21.2, floor_at(21.2), -3.2))], "gallery", d)
+				world.modules.place_many(self, "mod_barrier", [Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(21.9, floor_at(21.9), -4.3))], "gallery", d)
 			"crystal_clusters":
 				_crystals(rng)
 			"stalactites":

@@ -98,7 +98,7 @@
   ],
   "gate": [
    44.0,
-   -20.0
+   -25.0
   ],
   "rest": [
    -9.0,
@@ -111,19 +111,19 @@
   "road": [
    [
     26.0,
-    -20.0
+    -25.0
    ],
    [
     36.0,
-    -20.0
+    -25.0
    ],
    [
     50.0,
-    -20.0
+    -25.0
    ],
    [
     70.0,
-    -20.0
+    -25.0
    ]
   ],
   "plots": {
@@ -170,24 +170,24 @@
    "conveyor": {
     "pos": [
      -1.0,
-     -8.0
+     -8.2
     ],
     "yaw": 90.0,
     "work": [
-     0.0,
-     1.6
+     4.2,
+     -0.6
     ],
     "repair": [
-     0.0,
-     1.6
+     4.2,
+     -0.6
     ],
     "segment": 6.77,
-    "segments": 5
+    "segments": 2
    },
    "crusher": {
     "pos": [
      3.0,
-     -13.5
+     -13.7
     ],
     "yaw": 0.0,
     "work": [
@@ -292,7 +292,7 @@
    "warehouse": {
     "pos": [
      14.0,
-     -30.0
+     -33.5
     ],
     "yaw": 0.0,
     "work": [
@@ -307,7 +307,7 @@
    "depot": {
     "pos": [
      30.0,
-     -24.0
+     -27.0
     ],
     "yaw": 90.0,
     "work": [
@@ -349,6 +349,212 @@
      2.2
     ]
    }
+  },
+  "paths": [
+   {
+    "width": 1.6,
+    "points": [
+     [
+      -12.2,
+      -3.0
+     ],
+     [
+      -12.2,
+      -23.0
+     ]
+    ]
+   },
+   {
+    "width": 3.2,
+    "points": [
+     [
+      -12.2,
+      -23.0
+     ],
+     [
+      26.0,
+      -23.0
+     ]
+    ]
+   },
+   {
+    "width": 2.4,
+    "points": [
+     [
+      -9.0,
+      -28.5
+     ],
+     [
+      -9.0,
+      -23.0
+     ]
+    ]
+   },
+   {
+    "width": 2.2,
+    "points": [
+     [
+      14.3,
+      -23.0
+     ],
+     [
+      14.3,
+      -19.0
+     ]
+    ]
+   }
+  ],
+  "dressing": [
+   {
+    "module": "mod_bench",
+    "pos": [
+     -10.4,
+     -31.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_bench",
+    "pos": [
+     -7.6,
+     -31.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_water_tank",
+    "pos": [
+     -15.5,
+     -31.5
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_lamp_post",
+    "pos": [
+     -12.6,
+     -29.2
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_mine_entrance",
+    "pos": [
+     -36.0,
+     -33.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_container_blue",
+    "pos": [
+     38.5,
+     -32.0
+    ],
+    "yaw": 90
+   },
+   {
+    "module": "mod_container_red",
+    "pos": [
+     38.5,
+     -35.2
+    ],
+    "yaw": 90
+   },
+   {
+    "module": "mod_container_red",
+    "pos": [
+     -22.0,
+     -25.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_pallet",
+    "pos": [
+     -18.8,
+     -24.4
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_crate",
+    "pos": [
+     -18.9,
+     -26.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_gas_cylinder",
+    "pos": [
+     -24.4,
+     -17.6
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_gas_cylinder",
+    "pos": [
+     -23.8,
+     -17.8
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_cable_reel",
+    "pos": [
+     -20.6,
+     -12.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_sign_direction",
+    "pos": [
+     -10.2,
+     -2.2
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_barrel_oil",
+    "pos": [
+     -21.4,
+     -15.2
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_barrel_oil",
+    "pos": [
+     -21.0,
+     -16.0
+    ],
+    "yaw": 0
+   },
+   {
+    "module": "mod_workbench",
+    "pos": [
+     -25.0,
+     -8.4
+    ],
+    "yaw": 0
+   }
+  ],
+  "edge_barrier": {
+   "module": "mod_barrier",
+   "z": -1.0,
+   "x": [
+    -44.0,
+    48.0
+   ],
+   "skip_x": [
+    [
+     -20.0,
+     -11.0
+    ]
+   ]
   }
  }
 }

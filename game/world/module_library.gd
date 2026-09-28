@@ -47,7 +47,9 @@ func validate_definitions() -> Array:
 		var dims := Assets.dims(aid)
 		if dims.x <= 0.0 or dims.y <= 0.0 or dims.z <= 0.0:
 			e.append("module %s: non-positive dimensions %s" % [id, dims])
-		var b := Assets.bounds(aid).grow(0.05)
+		# Connection points sit on or just beyond the surface (couplings, a
+		# cart's load point above the rim), never far from the piece.
+		var b := Assets.bounds(aid).grow(0.3)
 		for cp in m.get("connection_points", []):
 			if not Assets.has_socket(aid, String(cp)):
 				e.append("module %s: connection point '%s' is not a socket of %s" % [id, cp, aid])
@@ -154,9 +156,75 @@ func reserve(module_or_asset: String, xform: Transform3D, zone: String, depth: i
 		"rect": Rect2(Vector2(box.position.x, box.position.z), Vector2(box.size.x, box.size.z)), "y0": box.position.y, "y1": box.end.y})
 
 
+## True when a solid record of the zone/depth overlaps `rect` (grown by margin).
+func blocked(zone: String, depth: int, rect: Rect2, margin: float = 0.0) -> bool:
+	var r2 := rect.grow(margin)
+	for r in records:
+		if r["solid"] and r["zone"] == zone and int(r["depth"]) == depth and (r["rect"] as Rect2).intersects(r2):
+			return true
+	return false
+
+
+## Removes the records placed for `owner` (e.g. a facility yard that is
+## rebuilt with its next tier).
+func release(owner: String) -> void:
+	var keep: Array = []
+	for r in records:
+		if String(r.get("owner", "")) != owner:
+			keep.append(r)
+	records = keep
+
+
+## Places a piece only when it fits (optional dressing): invalid spots are
+## skipped silently instead of being reported as errors.
+func try_place(parent: Node3D, module_id: String, xform: Transform3D, zone: String, depth: int, owner: String = "") -> bool:
+	if not check(module_id, xform, zone, depth).is_empty():
+		return false
+	return not place_many(parent, module_id, [xform], zone, depth, owner).is_empty()
+
+
+## Chains a module along a line by its connection points (start -> end), as
+## for fences and barriers: each piece snaps onto the previous piece's end.
+## Pieces that do not fit are skipped (the chain continues after them).
+func place_chain(parent: Node3D, module_id: String, from: Vector3, to: Vector3, zone: String, depth: int,
+		ground: Callable = Callable()) -> int:
+	var m := module(module_id)
+	var aid := String(m.get("asset", ""))
+	var step := 2.0
+	if Assets.has_socket(aid, "start") and Assets.has_socket(aid, "end"):
+		step = Assets.socket(aid, "start").origin.distance_to(Assets.socket(aid, "end").origin)
+	step = maxf(step, 0.25)
+	var dir := (to - from)
+	var total := dir.length()
+	dir = dir / maxf(total, 1e-4)
+	var yaw := atan2(dir.x, dir.z) - PI * 0.5
+	var basis := Basis(Vector3.UP, yaw)
+	var ok: Array = []
+	var s := step * 0.5
+	while s <= total - step * 0.5 + 1e-3:
+		var p := from + dir * s
+		if ground.is_valid():
+			p.y = float(ground.call(p.x, p.z))
+		var x := Transform3D(basis, p)
+		if check(module_id, x, zone, depth).is_empty():
+			ok.append(x)
+			_record(module_id, m, x, zone, depth, "")
+		s += step
+	if not ok.is_empty():
+		_instance(parent, module_id, m, ok, zone)
+	return ok.size()
+
+
+func _record(module_id: String, m: Dictionary, x: Transform3D, zone: String, depth: int, owner: String) -> void:
+	var box := _world_aabb(String(m.get("asset", "")), x)
+	records.append({"module": module_id, "zone": zone, "depth": depth, "solid": bool(m.get("solid", true)),
+		"clear": float(m.get("clearance_m", 0.1)), "owner": owner,
+		"rect": Rect2(Vector2(box.position.x, box.position.z), Vector2(box.size.x, box.size.z)), "y0": box.position.y, "y1": box.end.y})
+
+
 ## Validates and instances placements of one module under `parent`
 ## (batched as MultiMesh when the module allows it). Returns the node(s).
-func place_many(parent: Node3D, module_id: String, xforms: Array, zone: String, depth: int) -> Array:
+func place_many(parent: Node3D, module_id: String, xforms: Array, zone: String, depth: int, owner: String = "") -> Array:
 	var m := module(module_id)
 	var ok: Array = []
 	for x in xforms:
@@ -167,12 +235,13 @@ func place_many(parent: Node3D, module_id: String, xforms: Array, zone: String, 
 			if enforce:
 				continue
 		ok.append(x)
-		var box := _world_aabb(String(m.get("asset", "")), x)
-		records.append({"module": module_id, "zone": zone, "depth": depth, "solid": bool(m.get("solid", true)),
-			"clear": float(m.get("clearance_m", 0.1)),
-			"rect": Rect2(Vector2(box.position.x, box.position.z), Vector2(box.size.x, box.size.z)), "y0": box.position.y, "y1": box.end.y})
+		_record(module_id, m, x, zone, depth, owner)
 	if ok.is_empty() or m.is_empty():
 		return []
+	return _instance(parent, module_id, m, ok, zone)
+
+
+func _instance(parent: Node3D, _module_id: String, m: Dictionary, ok: Array, zone: String) -> Array:
 	var layer := Atmosphere.LAYER_UNDERGROUND if zone.begins_with("gallery") else Atmosphere.LAYER_SURFACE
 	var lod_end := float(m.get("lod", {}).get("visibility_end_m", 80.0))
 	if bool(m.get("batch", true)) and not bool(m.get("animated", false)):

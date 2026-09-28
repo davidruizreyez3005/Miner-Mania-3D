@@ -1,0 +1,22 @@
+{
+ "_comment": "Performance budgets checked by the automated tests (tests/unit/test_world.gd, test_balance.gd) and reported by tools/godot/perf_report.gd. Triangle counts are at full detail (LOD0) for everything placed in the built world; per-frame numbers are what the target mid-range phone must sustain.",
+ "schema": 1,
+ "target_fps": 60,
+ "min_fps": 30,
+ "triangles": {
+  "surface_lod0": 3200000,
+  "gallery_lod0_each": 350000,
+  "character_lod0": 26000
+ },
+ "agents": {
+  "max_full_rate_rigs": 28,
+  "max_workers": 90
+ },
+ "sim": {
+  "tick_ms": 4.0,
+  "offline_hour_ms": 12000
+ },
+ "world_build": {
+  "max_distinct_models": 140
+ }
+}

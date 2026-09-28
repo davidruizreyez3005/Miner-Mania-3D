@@ -7,6 +7,7 @@ extends Node3D
 ## Rendering never changes the economy - it only reads SimState / rt.
 
 signal rebuilt
+signal facilities_changed
 
 const PICK_LAYER := 1 << 1        # physics layer for tap targets
 
@@ -24,13 +25,27 @@ var lift_view: LiftView
 var sales_view: SalesView
 var modules: ModuleLibrary
 var placements: Array = []               # validated placement records (see ModuleLibrary)
+var agents: AgentManager
+var decor_obstacles: Array = []          # [centre xz, half xz] of decor inside the camp (agents avoid them)
+var surface_seats: Array = []            # Transform3D of bench seats at the surface rest area
 var _face_mesh: MeshInstance3D
 var _shaft_mesh: MeshInstance3D
 var _unlocked_sig := ""
 var _rng := RandomNumberGenerator.new()
 
 
+var timings: Dictionary = {}              # build step -> ms (performance budget checks)
+
+
+## Builds the whole world at once (tools, tests). The game uses begin() and
+## steps() so the loading screen can show progress between the steps.
 func setup(s: Simulation) -> void:
+	begin(s)
+	for st in steps():
+		run_step(st)
+
+
+func begin(s: Simulation) -> void:
 	sim = s
 	content = s.content
 	layout = s.layout
@@ -47,17 +62,45 @@ func setup(s: Simulation) -> void:
 	atmosphere = Atmosphere.new()
 	add_child(atmosphere)
 	atmosphere.setup(content.region_by_id.get(sim.state.region, content.regions[0]))
-	_build_terrain()
-	_build_surface()
-	_build_rock()
+
+
+## [label, Callable] build steps in order.
+func steps() -> Array:
+	return [
+		["Shaping the valley", _build_terrain],
+		["Raising the plant", _build_surface],
+		["Cutting the galleries", _build_rock],
+		["Rigging the headframe", _build_lift],
+		["Fuelling the trucks", _build_sales],
+		["Setting up camp", _build_surface_dressing],
+		["Planting the hills", _build_decor],
+		["Calling the crews", _build_agents],
+		["Lighting the lamps", func() -> void: sync(0.0)],
+	]
+
+
+func run_step(st: Array) -> void:
+	var t0 := Time.get_ticks_usec()
+	(st[1] as Callable).call()
+	timings[String(st[0])] = float(Time.get_ticks_usec() - t0) / 1000.0
+
+
+func _build_lift() -> void:
 	lift_view = LiftView.new()
 	surface_root.add_child(lift_view)
 	lift_view.setup(self)
+
+
+func _build_sales() -> void:
 	sales_view = SalesView.new()
 	surface_root.add_child(sales_view)
 	sales_view.setup(self)
-	_build_decor()
-	sync(0.0)
+
+
+func _build_agents() -> void:
+	agents = AgentManager.new()
+	add_child(agents)
+	agents.setup(self)
 
 
 # ------------------------------------------------------------------ terrain
@@ -76,9 +119,12 @@ func _build_terrain() -> void:
 	var pts := PackedVector2Array()
 	for p in road:
 		pts.append(Vector2(float(p[0]), float(p[1])))
-	tb.add_road(pts, 6.0)
-	tb.add_road(PackedVector2Array([Vector2(-12, -3), Vector2(-4, -20), Vector2(8, -21), Vector2(26, -20)]), 3.2)
-	tb.add_road(PackedVector2Array([Vector2(-9, -28), Vector2(-4, -20)]), 2.4)
+	tb.add_road(pts, SiteLayout.ROAD_WIDTH)
+	for path in layout.data.get("surface", {}).get("paths", []):
+		var pp := PackedVector2Array()
+		for q in path.get("points", []):
+			pp.append(Vector2(float(q[0]), float(q[1])))
+		tb.add_road(pp, float(path.get("width", 2.4)))
 	var region: Dictionary = content.region_by_id.get(sim.state.region, content.regions[0])
 	var mat := WorldMaterials.terrain(region)
 	var terrain := MeshInstance3D.new()
@@ -105,17 +151,7 @@ func ground_height(x: float, z: float) -> float:
 
 ## Axis-aligned footprint (x, z) of an asset rotated by yaw, relative to its origin.
 func footprint(asset_id: String, yaw_deg: float) -> Rect2:
-	var b := Assets.bounds(asset_id)
-	var corners := [Vector3(b.position.x, 0, b.position.z), Vector3(b.end.x, 0, b.position.z),
-		Vector3(b.end.x, 0, b.end.z), Vector3(b.position.x, 0, b.end.z)]
-	var basis := Basis(Vector3.UP, deg_to_rad(yaw_deg))
-	var lo := Vector2(INF, INF)
-	var hi := Vector2(-INF, -INF)
-	for c in corners:
-		var r: Vector3 = basis * c
-		lo = Vector2(minf(lo.x, r.x), minf(lo.y, r.z))
-		hi = Vector2(maxf(hi.x, r.x), maxf(hi.y, r.z))
-	return Rect2(lo, hi - lo)
+	return SiteLayout.footprint(asset_id, yaw_deg)
 
 
 # ------------------------------------------------------------------ surface
@@ -123,12 +159,82 @@ func footprint(asset_id: String, yaw_deg: float) -> Rect2:
 func _build_surface() -> void:
 	for fac in content.facilities:
 		var fid := String(fac["id"])
+		# Reserve every facility's largest footprint so surface dressing
+		# never lands on a plot, whatever tier it reaches later.
+		var plot := layout.plot(String(fac.get("plot", fid)))
+		var tier := 1 if fid == "headframe" else SiteLayout.max_tier(fid)
+		for r in SiteLayout.unit_rects(fid, plot, String(fac.get("asset", "")), tier):
+			var rr: Rect2 = r
+			modules.records.append({"module": "facility:" + fid, "zone": "surface", "depth": 0, "solid": true, "clear": 0.6,
+				"rect": rr, "y0": -1.0, "y1": 12.0, "nav_ignore": true})
 		if fid == "headframe":
 			continue                     # the lift view owns the headframe
 		var fv := FacilityView.new()
 		surface_root.add_child(fv)
 		fv.setup(self, fid)
 		facility_views[fid] = fv
+
+
+## Props around the camp from data (surface.dressing in the layout): a rest
+## area, lamps, containers, the old mine entrance. Every piece goes through
+## the module library's placement validation.
+func _build_surface_dressing() -> void:
+	# Roads, footpaths and the walk stops stay clear.
+	for rr in SiteLayout.road_rects(layout) + SiteLayout.path_rects(layout):
+		modules.records.append({"module": "path", "zone": "surface", "depth": 0, "solid": true, "clear": 0.2,
+			"rect": rr, "y0": -1.0, "y1": 4.0, "nav_ignore": true})
+	for loc in ["surface:landing", "surface:rest", "surface:gate", "plant"]:
+		var sp := layout.position(loc)
+		modules.records.append({"module": "stop:" + loc, "zone": "surface", "depth": 0, "solid": true, "clear": 0.2,
+			"rect": Rect2(Vector2(sp.x - 0.8, sp.z - 0.8), Vector2(1.6, 1.6)), "y0": -1.0, "y1": 2.0, "nav_ignore": true})
+	var by_module := {}
+	for item in layout.data.get("surface", {}).get("dressing", []):
+		var mid := String(item.get("module", ""))
+		var pos: Array = item.get("pos", [0, 0])
+		var x := float(pos[0])
+		var z := float(pos[1])
+		var t := Transform3D(Basis(Vector3.UP, deg_to_rad(float(item.get("yaw", 0.0)))), Vector3(x, ground_height(x, z), z))
+		(by_module.get_or_add(mid, []) as Array).append(t)
+		if mid == "mod_bench":
+			var aid := String(modules.module(mid).get("asset", "prop_bench_01"))
+			if Assets.has_socket(aid, "seat"):
+				var seat := t * Assets.socket(aid, "seat")
+				surface_seats.append(seat * Transform3D(Basis(), Vector3(-0.4, 0, 0)))
+				surface_seats.append(seat * Transform3D(Basis(), Vector3(0.4, 0, 0)))
+	for mid in by_module:
+		modules.place_many(surface_root, String(mid), by_module[mid], "surface", 0)
+	# Safety barrier chained along the cut edge (skipping the shaft collar).
+	var eb: Dictionary = layout.data.get("surface", {}).get("edge_barrier", {})
+	if not eb.is_empty():
+		var ez := float(eb.get("z", -1.0))
+		var ex: Array = eb.get("x", [-44.0, 48.0])
+		var spans: Array = [[float(ex[0]), float(ex[1])]]
+		for sk in eb.get("skip_x", []):
+			var nxt: Array = []
+			for span in spans:
+				var a := float(span[0])
+				var b := float(span[1])
+				var s0 := float(sk[0])
+				var s1 := float(sk[1])
+				if s1 <= a or s0 >= b:
+					nxt.append([a, b])
+					continue
+				if s0 > a:
+					nxt.append([a, s0])
+				if s1 < b:
+					nxt.append([s1, b])
+			spans = nxt
+		for span in spans:
+			modules.place_chain(surface_root, String(eb.get("module", "mod_barrier")), Vector3(float(span[0]), 0, ez),
+				Vector3(float(span[1]), 0, ez), "surface", 0, ground_height)
+
+
+## Bench seats (worker root transforms for the Sit clip) on a level.
+func seats(level: int) -> Array:
+	if level <= 0:
+		return surface_seats
+	var dv: DepthView = depth_views.get(level)
+	return dv.bench_seats() if dv else []
 
 
 # --------------------------------------------------------------------- rock
@@ -213,7 +319,7 @@ func _build_decor() -> void:
 		var in_camp := camp.has_point(p)
 		if in_camp and _rng.randf() < 0.93:
 			continue
-		if _blocked(p, 3.0):
+		if _blocked(p, 3.0) or modules.blocked("surface", 0, Rect2(p - Vector2(1.2, 1.2), Vector2(2.4, 2.4))):
 			continue
 		var h := tb.height(x, z)
 		if h > 26.0:
@@ -221,6 +327,8 @@ func _build_decor() -> void:
 		var basis := Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3.ONE * _rng.randf_range(0.75, 1.35))
 		var t := Transform3D(basis, Vector3(x, h - 0.05, z))
 		var roll := _rng.randf()
+		if in_camp and roll < 0.72:
+			decor_obstacles.append([p, Vector2(0.6, 0.6)])
 		if roll < 0.5 and not in_camp:
 			var tid := String(veg[_rng.randi_range(0, veg.size() - 1)]) if veg.size() > 0 else "env_tree_pine_01"
 			if tid.begins_with("env_tree"):
@@ -274,6 +382,8 @@ func sync(delta: float) -> void:
 		(facility_views[fid] as FacilityView).sync(delta)
 	for d in depth_views:
 		(depth_views[d] as DepthView).sync(delta)
+	if agents:
+		agents.sync(delta)
 	lift_view.sync(delta)
 	sales_view.sync(delta)
 
@@ -281,6 +391,12 @@ func sync(delta: float) -> void:
 func _process(delta: float) -> void:
 	if sim != null:
 		sync(delta)
+
+
+## The agents follow the world's own sync (not a separate _process) so the
+## order is fixed: facilities, depths, agents, lift, trucks.
+func notify_facility_rebuilt() -> void:
+	facilities_changed.emit()
 
 
 # ------------------------------------------------------------------ queries

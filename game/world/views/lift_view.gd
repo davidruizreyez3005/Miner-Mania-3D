@@ -144,6 +144,23 @@ func _apply_pose() -> void:
 		skeleton.set_bone_pose_rotation(sheave_bone, sheave_rest * Quaternion(Vector3.UP, _sheave_angle))
 
 
+## Where the lift operator (operate) or a mechanic (repair) stands.
+func work_transform(kind: String = "operate") -> Transform3D:
+	var sock := "winder_door" if kind == "operate" else "cage_entry"
+	if Assets.has_socket(ASSET, sock):
+		return transform * Assets.socket(ASSET, sock)
+	var pl := world.layout.plot("headframe")
+	var w: Array = pl.get("work" if kind == "operate" else "repair", [3.4, -9.0])
+	return transform * Transform3D(Basis(), Vector3(float(w[0]), 0, float(w[1])))
+
+
+## Footprint agents walk around (the cage is entered straight from the landing).
+func blocked_boxes() -> Array:
+	var b := Assets.bounds(ASSET)
+	var c := transform * Vector3(b.get_center().x, 0, b.get_center().z)
+	return [[Vector2(c.x, c.z), Vector2(b.size.x, b.size.z) * 0.5, rotation.y]]
+
+
 ## World position of the cage (for effects, the camera and riding workers).
 func cage_position() -> Vector3:
 	return global_transform * Vector3(0, cage_y, 0)
