@@ -17,7 +17,8 @@ on:
       - "assets/source/**"
       - "godot/**"
       - "tools/**"
-      - "project.godot"
+      - "!tools/godot/**"
+      - "!tools/apk/**"
       - "requirements.txt"
       - ".github/workflows/assets.yml"
   pull_request:
@@ -26,7 +27,8 @@ on:
       - "assets/source/**"
       - "godot/**"
       - "tools/**"
-      - "project.godot"
+      - "!tools/godot/**"
+      - "!tools/apk/**"
       - "requirements.txt"
       - ".github/workflows/assets.yml"
   workflow_dispatch:
