@@ -3,7 +3,9 @@
 Each node is a fractured host-rock mound with its resource embedded in a
 material-true way: iron/copper/silver ore veins in the rock plus protruding
 ore chunks, coal seams and lumps, gold nuggets in quartz, crystal clusters
-(amethyst, diamond) and glowing uranium crystals. The states share the seed,
+(quartz, amethyst, emerald, ruby, sapphire, diamond), platinum ore with
+metal chunks, plain stone, and glowing uranium, voidstone and aether
+crystals. The states share the seed,
 so the silhouette erodes consistently: ``damaged`` loses most protruding ore
 and gains a fresh broken face, ``depleted`` is a low rubble pile with traces.
 
@@ -30,6 +32,14 @@ RESOURCES = {
     "amethyst": dict(host="stone:stone_gray", rock="stone:stone_gray", ore="crystal_amethyst_glow", feature="crystals"),
     "diamond": dict(host="stone:stone_dark", rock="stone:stone_dark", ore="crystal_diamond", feature="crystals"),
     "uranium": dict(host="stone:stone_dark", rock="stone:stone_dark", ore="crystal_uranium_glow", feature="crystals"),
+    "stone": dict(host="stone:stone_gray", rock="stone:stone_warm", ore="stone:stone_warm", feature="chunks"),
+    "quartz": dict(host="stone:stone_gray", rock="stone:stone_gray", ore="crystal_quartz", feature="crystals"),
+    "platinum": dict(host="ore_platinum", rock="stone:stone_dark", ore="platinum", feature="chunks"),
+    "emerald": dict(host="stone:stone_dark", rock="stone:stone_dark", ore="crystal_emerald", feature="crystals"),
+    "ruby": dict(host="stone:stone_warm", rock="stone:stone_warm", ore="crystal_ruby", feature="crystals"),
+    "sapphire": dict(host="stone:stone_gray", rock="stone:stone_gray", ore="crystal_sapphire", feature="crystals"),
+    "voidstone": dict(host="stone:stone_dark", rock="stone:stone_dark", ore="crystal_voidstone_glow", feature="crystals"),
+    "aether": dict(host="stone:stone_dark", rock="stone:stone_dark", ore="crystal_aether_glow", feature="crystals"),
 }
 
 

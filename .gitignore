@@ -41,3 +41,8 @@ node_modules/
 # ---- Game build outputs ---------------------------------------------------------
 /build/
 *.uid.tmp
+assets/generated/catalog.json
+# Procedural audio and texture outputs (tools/audio/synth.py, tools/textures/texgen.py)
+assets/generated/**/*.wav
+assets/generated/audio/*.json
+assets/generated/textures/*.json

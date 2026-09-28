@@ -31,10 +31,11 @@ func _initialize() -> void:
 		if f in SKIP:
 			continue
 		cap.errors.clear()
+		# An uncached load parses, analyses and compiles the script; any error is logged.
 		var s: Script = ResourceLoader.load(f, "", ResourceLoader.CACHE_MODE_IGNORE)
 		var ok := s != null and cap.errors.is_empty()
-		if s is GDScript and ok:
-			ok = (s as GDScript).reload() == OK and cap.errors.is_empty()
+		if ok and s is GDScript:
+			ok = (s as GDScript).can_instantiate()
 		if not ok:
 			failed.append({"file": f, "errors": cap.errors.duplicate()})
 			print("FAIL ", f)

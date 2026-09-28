@@ -1,0 +1,72 @@
+extends Node
+## Autoload wrapper around GameStateMachine: the only place the global game
+## state changes. Every transition is validated, logged and broadcast on the
+## EventBus; refused transitions are reported to the console and telemetry.
+
+const State := GameStateMachine.State
+
+var fsm := GameStateMachine.new()
+var payload: Dictionary = {}          # data attached to the latest transition (e.g. the offline report)
+
+
+func current() -> int:
+	return fsm.current()
+
+
+func is_state(s: int) -> bool:
+	return fsm.current() == s
+
+
+func has(s: int) -> bool:
+	return fsm.has(s)
+
+
+func sim_running() -> bool:
+	return fsm.sim_running()
+
+
+func request(to: int, data: Dictionary = {}) -> bool:
+	var from := fsm.current()
+	if not fsm.request(to):
+		push_warning("GameState: " + fsm.last_error)
+		Telemetry.track("state_refused", {"from": GameStateMachine.name_of(from), "to": GameStateMachine.name_of(to)})
+		return false
+	payload = data
+	EventBus.state_changed.emit(from, to)
+	return true
+
+
+func back() -> bool:
+	var from := fsm.current()
+	if not fsm.back():
+		return false
+	EventBus.state_changed.emit(from, fsm.current())
+	return true
+
+
+func close(s: int) -> bool:
+	var from := fsm.current()
+	if not fsm.close(s):
+		return false
+	EventBus.state_changed.emit(from, fsm.current())
+	return true
+
+
+## Opens an overlay if possible, otherwise closes overlays until it is.
+func open_overlay(s: int, data: Dictionary = {}) -> bool:
+	if fsm.has(s):
+		return true
+	if request(s, data):
+		return true
+	while not fsm.overlays.is_empty() and not fsm.can(s):
+		back()
+	return request(s, data)
+
+
+func fail(message: String) -> void:
+	push_error("GameState ERROR: " + message)
+	payload = {"message": message}
+	if not fsm.request(State.ERROR):
+		fsm.overlays.clear()
+		fsm.base = State.ERROR
+	EventBus.state_changed.emit(-1, State.ERROR)

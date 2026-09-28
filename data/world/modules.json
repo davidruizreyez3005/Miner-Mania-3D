@@ -1,5 +1,1091 @@
 {
-  "_comment": "World module library (filled in by the world builder phase).",
-  "schema": 1,
-  "modules": []
+ "_comment": "World module library. Every placed piece of the world references a module: its generated asset, category, the zones it may be placed in (surface | gallery | gallery_wall), how it mounts (floor | ceiling | wall), whether it is solid (takes part in overlap checks, with clearance_m margin), allowed rotation step and scale range, connection points (asset sockets used for snapping), LOD visibility range, collision, biome and whether it may be batched (MultiMesh). ModuleLibrary validates the definitions against the asset catalog and every placement against these constraints.",
+ "schema": 1,
+ "zones": {
+  "gallery": {
+   "x": [
+    -13.0,
+    23.0
+   ],
+   "z": [
+    -9.0,
+    -0.1
+   ],
+   "margin_m": 0.2
+  },
+  "gallery_wall": {
+   "x": [
+    -13.0,
+    23.0
+   ],
+   "z": [
+    -9.5,
+    -6.5
+   ],
+   "margin_m": 0.0
+  },
+  "surface": {
+   "x": [
+    -60.0,
+    64.0
+   ],
+   "z": [
+    -96.0,
+    -0.2
+   ],
+   "margin_m": 0.0
+  }
+ },
+ "walkway": {
+  "z": [
+   -3.6,
+   -2.6
+  ],
+  "x": [
+   -11.0,
+   19.0
+  ]
+ },
+ "tolerances": {
+  "ground_m": 0.3,
+  "embed_m": 0.25,
+  "ceiling_m": 0.45,
+  "dims_rel": 0.02,
+  "connection_m": 0.02
+ },
+ "modules": [
+  {
+   "id": "mod_rail_straight",
+   "asset": "env_rail_straight_01",
+   "category": "rail",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end",
+    "cart"
+   ],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_rail_buffer",
+   "asset": "env_rail_buffer_01",
+   "category": "rail",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "cart"
+   ],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_support_wood",
+   "asset": "env_support_wood_01",
+   "category": "structure",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.05,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end"
+   ],
+   "lod": {
+    "visibility_end_m": 90
+   },
+   "collision": "none",
+   "biome": "earth",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_support_steel",
+   "asset": "env_support_steel_01",
+   "category": "structure",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.05,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 90
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_lamp_hanging",
+   "asset": "env_lamp_hanging_01",
+   "category": "light",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "ceiling",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_bench",
+   "asset": "prop_bench_01",
+   "category": "prop",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_barrel_wood",
+   "asset": "prop_barrel_wood_01",
+   "category": "prop",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_barrel_oil",
+   "asset": "prop_barrel_oil_01",
+   "category": "prop",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_crate",
+   "asset": "prop_crate_wood_02",
+   "category": "prop",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_ore_sack",
+   "asset": "prop_ore_sack_01",
+   "category": "prop",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 50
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_rock_small",
+   "asset": "env_rock_small_01",
+   "category": "decor",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    0.5,
+    1.4
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_pile_coal",
+   "asset": "env_pile_coal_01",
+   "category": "decor",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_sign_warning",
+   "asset": "env_sign_warning_01",
+   "category": "prop",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_cable_tray",
+   "asset": "env_cable_tray_01",
+   "category": "structure",
+   "zones": [
+    "gallery_wall"
+   ],
+   "mount": "wall",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end"
+   ],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_pipe_straight",
+   "asset": "env_pipe_straight_01",
+   "category": "structure",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end"
+   ],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_pump_small",
+   "asset": "mach_pump_01",
+   "category": "machine",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": false,
+   "animated": true
+  },
+  {
+   "id": "mod_container",
+   "asset": "env_container_01",
+   "category": "structure",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 110
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_scaffold",
+   "asset": "env_scaffold_01",
+   "category": "structure",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 90
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_catwalk",
+   "asset": "env_catwalk_01",
+   "category": "structure",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end"
+   ],
+   "lod": {
+    "visibility_end_m": 90
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_lamp_post",
+   "asset": "env_lamp_post_01",
+   "category": "light",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 100
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_barrier",
+   "asset": "env_barrier_01",
+   "category": "structure",
+   "zones": [
+    "gallery",
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end"
+   ],
+   "lod": {
+    "visibility_end_m": 80
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_drill_rig",
+   "asset": "mach_drill_01",
+   "category": "machine",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.2,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 90
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": false,
+   "animated": true
+  },
+  {
+   "id": "mod_excavator",
+   "asset": "veh_excavator_01",
+   "category": "vehicle",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.2,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 100
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": false,
+   "animated": true
+  },
+  {
+   "id": "mod_mine_cart",
+   "asset": "veh_mine_cart_01",
+   "category": "vehicle",
+   "zones": [
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "coupling_front",
+    "coupling_rear",
+    "load"
+   ],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": false,
+   "animated": true
+  },
+  {
+   "id": "mod_fence",
+   "asset": "env_fence_01",
+   "category": "structure",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "start",
+    "end"
+   ],
+   "lod": {
+    "visibility_end_m": 90
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_cone",
+   "asset": "prop_cone_01",
+   "category": "prop",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 50
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_container_blue",
+   "asset": "env_container_01",
+   "category": "structure",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 140
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_container_red",
+   "asset": "env_container_02",
+   "category": "structure",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 140
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_water_tank",
+   "asset": "env_water_tank_01",
+   "category": "landmark",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.5,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 200
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_mine_entrance",
+   "asset": "bld_mine_entrance_01",
+   "category": "landmark",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.5,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 200
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": false,
+   "animated": true
+  },
+  {
+   "id": "mod_pallet",
+   "asset": "prop_pallet_01",
+   "category": "prop",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_gas_cylinder",
+   "asset": "prop_gas_cylinder_01",
+   "category": "prop",
+   "zones": [
+    "surface",
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 50
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_cable_reel",
+   "asset": "env_cable_reel_01",
+   "category": "prop",
+   "zones": [
+    "surface",
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_sign_direction",
+   "asset": "env_sign_direction_01",
+   "category": "prop",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 80
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_workbench",
+   "asset": "prop_workbench_01",
+   "category": "prop",
+   "zones": [
+    "surface",
+    "gallery"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 60
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_utility_truck",
+   "asset": "veh_utility_01",
+   "category": "vehicle",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 90,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 140
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": false,
+   "animated": true
+  },
+  {
+   "id": "mod_tree_pine",
+   "asset": "env_tree_pine_01",
+   "category": "vegetation",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    0.7,
+    1.4
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 150
+   },
+   "collision": "none",
+   "biome": "forest",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_tree_dead",
+   "asset": "env_tree_dead_01",
+   "category": "vegetation",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    0.7,
+    1.4
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 150
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_bush",
+   "asset": "env_bush_01",
+   "category": "vegetation",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    0.7,
+    1.4
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 70
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_grass",
+   "asset": "env_grass_clump_01",
+   "category": "vegetation",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": false,
+   "clearance_m": 0.1,
+   "rotation_step_deg": 1,
+   "scale": [
+    0.7,
+    1.4
+   ],
+   "connection_points": [],
+   "lod": {
+    "visibility_end_m": 45
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  },
+  {
+   "id": "mod_cliff",
+   "asset": "env_cliff_01",
+   "category": "terrain",
+   "zones": [
+    "surface"
+   ],
+   "mount": "floor",
+   "solid": true,
+   "clearance_m": -1.0,
+   "rotation_step_deg": 1,
+   "scale": [
+    1.0,
+    1.0
+   ],
+   "connection_points": [
+    "tile_left",
+    "tile_right"
+   ],
+   "lod": {
+    "visibility_end_m": 170
+   },
+   "collision": "none",
+   "biome": "any",
+   "batch": true,
+   "animated": false
+  }
+ ]
 }

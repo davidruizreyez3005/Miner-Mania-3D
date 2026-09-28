@@ -43,7 +43,9 @@
     "emissive_amber": "#FFA21E",
     "emissive_molten": "#FF6A10",
     "emissive_uranium": "#86FF3C",
-    "emissive_crystal": "#B070FF"
+    "emissive_crystal": "#B070FF",
+    "emissive_void": "#3CFFF0",
+    "emissive_aether": "#FF6AE6"
   },
   "fabric": {
     "denim_blue": "#3E5673",
@@ -108,7 +110,15 @@
     "amethyst": "#8C52CC",
     "diamond": "#D4F1FF",
     "uranium": "#78E83A",
-    "host_rock": "#6E6760"
+    "host_rock": "#6E6760",
+    "quartz": "#E9E4D8",
+    "platinum_ore": "#7E7F84",
+    "platinum_metal": "#E2E2E6",
+    "emerald": "#1FAF6B",
+    "ruby": "#D7263D",
+    "sapphire": "#2A5BD7",
+    "voidstone": "#1FC9BD",
+    "aether": "#E03CC4"
   },
   "nature": {
     "stone_gray": "#7F7B74",
