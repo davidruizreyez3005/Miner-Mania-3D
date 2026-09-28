@@ -290,7 +290,9 @@ class BodyCage:
         L_fa = (wr - el).length
         # (center, rx(top/back), ry(front/thumb), angle-blend, weights)
         spec = [
-            (sh + axis * 0.045, 0.064 * s * self.shoulder, 0.06 * s, 0.0, {ua: 0.6, cl: 0.4}),
+            # First ring shares some spine weight with the torso armhole loop it
+            # is bridged to, so the armpit blends over the band instead of jumping.
+            (sh + axis * 0.045, 0.064 * s * self.shoulder, 0.06 * s, 0.0, {ua: 0.55, cl: 0.33, "spine_03": 0.12}),
             (sh + axis * (L_ua * 0.45), 0.052 * s, 0.056 * s, 0.1, {ua: 1.0}),
             (sh + axis * (L_ua * 0.82), 0.045 * s, 0.046 * s, 0.2, {ua: 0.8, fa: 0.2}),
             (el + axis * 0.0, 0.043 * s, 0.043 * s, 0.3, {ua: 0.5, fa: 0.5}),

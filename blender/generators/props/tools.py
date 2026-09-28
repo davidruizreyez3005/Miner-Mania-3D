@@ -26,13 +26,24 @@ BRIGHT = "steel"
 
 
 def _handle(g, z0, z1, r0, r1, mat=WOOD, oval=0.82, swell=0.1):
-    prof = [(0.0, z0 - 0.004), (r0 * 0.8, z0 - 0.004), (r0 * 1.15, z0 + 0.01), (r0, z0 + 0.03)]
-    for t in (0.3, 0.6, 0.85):
-        z = z0 + (z1 - z0) * t
-        r = r0 + (r1 - r0) * t + swell * r0 * math.sin(math.pi * t) * 0.3
-        prof.append((r, z))
-    prof += [(r1, z1), (0.0, z1)]
-    g.lathe(prof, segments=12, matrix=trs(scale=(1.0, oval, 1.0)), mat=mat)
+    """Tapered oval handle with a flared butt. Long handles are built as
+    stacked open sections (~0.3 m) whose joint rings coincide: one long lathe
+    unwraps into ~20:1 UV strips that pack poorly; short sections pack well."""
+    pieces = max(1, int(round((z1 - z0) / 0.3)))
+    def radius(z):
+        t = (z - z0) / (z1 - z0)
+        return r0 + (r1 - r0) * t + swell * r0 * math.sin(math.pi * t) * 0.3
+
+    m = trs(scale=(1.0, oval, 1.0))
+    start = z0 + 0.03
+    cuts = [start + (z1 - start) * k / pieces for k in range(pieces + 1)]
+    for k in range(pieces):
+        a, b = cuts[k], cuts[k + 1]
+        prof = [(0.0, z0 - 0.004), (r0 * 0.8, z0 - 0.004), (r0 * 1.15, z0 + 0.01)] if k == 0 else []
+        prof += [(radius(a + (b - a) * i / 2), a + (b - a) * i / 2) for i in range(3)]
+        if k == pieces - 1:
+            prof.append((0.0, z1))
+        g.lathe(prof, segments=12, matrix=m, mat=mat, caps=False)
 
 
 def pickaxe(g, d):

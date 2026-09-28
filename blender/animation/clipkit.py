@@ -129,7 +129,9 @@ def add(*poses):
 
 
 def blend(a, b, t):
-    keys_ = set(a) | set(b)
+    # Ordered union: bone names are strings, whose set order changes with every
+    # process (hash randomization), and this order becomes the fcurve order.
+    keys_ = list(a) + [k for k in b if k not in a]
     out = {}
     for k in keys_:
         va = a.get(k, (0.0, 0.0, 0.0))

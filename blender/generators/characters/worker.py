@@ -163,7 +163,7 @@ def build(ctx):
     b_sg, b_hard, b_det = boots_mod.build_boots(leather_key="leather:leather_brown" if d.boots != "rubber" else "rubber")
     parts.append(b_sg)
     details.append((b_hard, 99))
-    details.append((b_det, 1))
+    details.append((b_det, 0))              # laces and pull tab: LOD0-only detail
     body = _body_remains(cage, hidden, f"skin:{skin}")
     if body is not None:
         parts.insert(0, body)

@@ -41,7 +41,7 @@ def main():
         errors = build.get("errors") or []
         if errors:
             out.append("\n### Errors\n")
-            out += [f"- `{e.get('asset_id')}` {e.get('code')}: {e.get('message')}" for e in errors[:50]]
+            out += [f"- `{e.get('asset') or 'build'}` ({e.get('stage')}): {e.get('message')}" for e in errors[:50]]
         warnings = build.get("warnings") or []
         if warnings:
             counts = {}

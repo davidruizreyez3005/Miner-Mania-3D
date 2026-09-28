@@ -17,6 +17,7 @@ import numpy as np
 
 from core import scene as scn
 from core.errors import PipelineError
+from utilities import tangents
 
 from .nodes import AO_NODE, EDGE_NODE
 
@@ -154,16 +155,99 @@ def _edge_material(ao_distance):
 BAKE_TIMINGS = {}
 
 
-def _bake(kind, margin, samples, **kw):
+def _bake(kind, margin, samples, clear=True, **kw):
     import time
     scene = bpy.context.scene
     scene.cycles.samples = samples
     t = time.time()
-    r = bpy.ops.object.bake(type=kind, margin=margin, margin_type="EXTEND", use_clear=True,
+    r = bpy.ops.object.bake(type=kind, margin=margin, margin_type="EXTEND", use_clear=clear,
                             target="IMAGE_TEXTURES", use_selected_to_active=False, **kw)
     BAKE_TIMINGS[kind] = round(BAKE_TIMINGS.get(kind, 0.0) + time.time() - t, 2)
     if "FINISHED" not in r:
         raise PipelineError(f"Cycles bake pass {kind} failed: {r}")
+
+
+NORMAL_KW = dict(normal_space="TANGENT", normal_r="POS_X", normal_g="POS_Y", normal_b="POS_Z")
+
+
+def _extend_margin(rgb, filled, passes):
+    """Grow baked texels into their empty surroundings like Blender's EXTEND
+    bake margin (imbuf ``IMB_filter_extend``): each pass, an empty texel with
+    a filled 4-neighbour takes the weighted mean of its filled 8-neighbours
+    (orthogonal weight 2, diagonal 1); coordinates clamp at the image border."""
+    rgb = rgb.astype(np.float64)
+    filled = filled.copy()
+    h, w = filled.shape
+    for _ in range(passes):
+        pr = np.pad(rgb, ((1, 1), (1, 1), (0, 0)), mode="edge")
+        pf = np.pad(filled, 1, mode="edge")
+        acc = np.zeros_like(rgb)
+        wsum = np.zeros((h, w))
+        orth = np.zeros((h, w), dtype=bool)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dy == 0 and dx == 0:
+                    continue
+                f = pf[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+                wt = 2.0 if dy == 0 or dx == 0 else 1.0
+                acc += pr[1 + dy:1 + dy + h, 1 + dx:1 + dx + w] * (f * wt)[..., None]
+                wsum += f * wt
+                if dy == 0 or dx == 0:
+                    orth |= f
+        grow = ~filled & orth
+        if not grow.any():
+            break
+        rgb[grow] = acc[grow] / wsum[grow][:, None]
+        filled |= grow
+    return rgb
+
+
+def _bake_normal(proxy, mats, img, margin):
+    """Tangent-space normal pass.
+
+    Cycles' MikkTSpace tangents are not reproducible on meshes above
+    ``tangents.CHUNK_TRIS`` (see utilities/tangents.py), so a larger proxy is
+    baked as chunk objects of whole components, which gives exactly the
+    single-threaded tangents. The chunks bake together, without margin and
+    without clearing, into an RGBA image pre-filled with a flat normal at
+    alpha 0, so alpha marks the texels the bake wrote (Blender's own clear
+    leaves alpha alone for single-object bakes); the margin is then grown the
+    way Blender's EXTEND margin grows it.
+    """
+    chunks = tangents.face_chunks(proxy.data)
+    if len(chunks) <= 1:
+        _set_target(mats, img)
+        _bake("NORMAL", margin, 1, **NORMAL_KW)
+        return
+    size = img.size[0]
+    tmp = bpy.data.images.new(f"{img.name}_chunks", size, size, alpha=True, float_buffer=False)
+    tmp.colorspace_settings.name = "Non-Color"
+    tmp.pixels.foreach_set(np.tile(np.array([0.5, 0.5, 1.0, 0.0], dtype=np.float32), size * size))
+    parts = []
+    hidden = proxy.hide_render
+    try:
+        for i, faces in enumerate(chunks):
+            me, _ = tangents.chunk_mesh(proxy.data, faces, f"__bake_chunk_{i}")
+            o = bpy.data.objects.new(me.name, me)
+            o.matrix_world = proxy.matrix_world.copy()
+            scn.link(o)
+            parts.append(o)
+        proxy.hide_render = True
+        scn.select_only(parts, parts[0])
+        _set_target(mats, tmp)
+        _bake("NORMAL", 0, 1, clear=False, **NORMAL_KW)
+        px = _pixels(tmp)
+        out = np.ones_like(px)
+        out[..., :3] = _extend_margin(px[..., :3], px[..., 3] > 0.5, margin)
+        img.pixels.foreach_set(out.ravel())
+    finally:
+        proxy.hide_render = hidden
+        for o in parts:
+            me = o.data
+            bpy.data.objects.remove(o, do_unlink=True)
+            bpy.data.meshes.remove(me)
+        bpy.data.images.remove(tmp)
+        scn.select_only([proxy], proxy)
 
 
 def _pixels(img):
@@ -330,8 +414,7 @@ def _bake_passes(proxy, mats, size, stem, work_dir, tcfg, margin, ao_distance):
         if n is not None:
             n.image = img_edge
 
-    _set_target(mats, img_nrm)
-    _bake("NORMAL", margin, 1, normal_space="TANGENT", normal_r="POS_X", normal_g="POS_Y", normal_b="POS_Z")
+    _bake_normal(proxy, mats, img_nrm, margin)
 
     for img, sock in ((img_col, "Base Color"), (img_rgh, "Roughness"), (img_met, "Metallic")):
         _set_target(mats, img)

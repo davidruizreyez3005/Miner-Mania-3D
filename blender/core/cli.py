@@ -183,10 +183,11 @@ def run(argv):
         extra["determinism"] = verify_determinism(args, selection)
         if extra["determinism"]["status"] != "passed":
             all_ok = False
-    rep = report.write(results, cfg, args.profile, started, time.time(), extra)
-    if len(results) < len(selection):
-        skipped = [d.id for d in selection if d.id not in {r.id for r in results}]
+    skipped = [d.id for d in selection if d.id not in {r.id for r in results}]
+    if skipped:
+        extra["not_built"] = skipped
         log.error(f"not built because of an earlier failure: {skipped}")
+    rep = report.write(results, cfg, args.profile, started, time.time(), extra)
     log.info(f"manifest: {paths.rel(manifest_path)} ({man['asset_count']} assets)")
     log.info(f"report: {rep['successful_assets']}/{rep['asset_count']} assets ok, "
              f"{rep['triangles_total_lod0']} LOD0 triangles, {rep['animation_count']} animation clips")

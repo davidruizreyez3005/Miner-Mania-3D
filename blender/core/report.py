@@ -25,8 +25,20 @@ def write(results, cfg, profile, started, finished, extra=None):
         anim_names.update(o.animations)
     tri_total = sum(o.triangles for o in outputs)
     lod_tri_total = sum(sum(o.lod_triangles) for o in outputs)
+    extra = dict(extra or {})
+    # Build-level failures are errors too, so the status never says "passed"
+    # for a run that exits non-zero.
+    det = extra.get("determinism")
+    if det and det.get("status") != "passed":
+        why = det.get("reason") or (f"{len(det.get('mismatched', []))} GLBs differ between two builds "
+                                    f"{det.get('mismatched', [])[:10]}, {len(det.get('missing', []))} "
+                                    f"produced by only one build {det.get('missing', [])[:10]}")
+        errors.append({"asset": None, "stage": "determinism", "message": why})
+    if extra.get("not_built"):
+        errors.append({"asset": None, "stage": "not_built",
+                       "message": f"not built because of an earlier failure: {extra['not_built']}"})
     report = {
-        "status": "passed" if not failed and results else "failed",
+        "status": "passed" if results and not errors else "failed",
         "profile": profile,
         "blender_version": bpy.app.version_string,
         "pipeline_version": cfg["pipeline"]["version"],
@@ -60,8 +72,7 @@ def write(results, cfg, profile, started, finished, extra=None):
             for r in results
         ],
     }
-    if extra:
-        report.update(extra)
+    report.update(extra)
     paths.ensure_dir(paths.REPORT_DIR)
     with open(os.path.join(paths.REPORT_DIR, "build_report.json"), "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2)
@@ -102,7 +113,7 @@ def render_text(r):
         lines.append(f"  WARN  [{w.get('asset')}] {w.get('code')}: {w.get('message')}")
     lines += ["", f"Errors ({len(r['errors'])}):"]
     for e in r["errors"]:
-        lines.append(f"  ERROR [{e['asset']}] stage={e['stage']}: {e['message']}")
+        lines.append(f"  ERROR [{e['asset'] or 'build'}] stage={e['stage']}: {e['message']}")
     lines += ["", "Assets:"]
     for a in r["assets"]:
         for o in a["outputs"]:

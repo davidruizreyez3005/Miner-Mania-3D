@@ -12,9 +12,10 @@ import os
 import bpy
 from mathutils.bvhtree import BVHTree
 
-from core import scene as scn
+from core import log, scene as scn
 from core.errors import PipelineError
 from materials import baking
+from utilities import tangents
 from utilities.meshkit import apply_modifiers
 
 from . import assembly
@@ -85,6 +86,52 @@ def _remove_degenerate(obj, min_edge=1e-5):
     # malformed faces); do it here so recorded and exported counts agree.
     obj.data.validate(clean_customdata=False)
     obj.data.update()
+
+
+def _fix_degenerate_tangents(obj, uv_name="UVMap", rounds=4):
+    """Collapse faces whose MikkTSpace tangent degenerates after decimation.
+
+    Collapses interpolate UVs and custom normals; a few triangles can end up
+    with (near) zero UV area or a normal lying in their plane, and the glTF
+    exporter (which uses the same MikkTSpace tangents) then writes zero
+    tangents. Their shortest edge is collapsed until every tangent is unit.
+    Returns the number of faces repaired.
+    """
+    import bmesh
+    import numpy as np
+    me = obj.data
+    if uv_name not in me.uv_layers:
+        return 0
+    repaired = 0
+    for _ in range(rounds):
+        try:
+            tangent, _ = tangents.loop_tangents(me, uv_name)
+        except RuntimeError:
+            return repaired
+        me.free_tangents()
+        total = np.empty(len(me.polygons), dtype=np.int64)
+        me.polygons.foreach_get("loop_total", total)
+        length = np.linalg.norm(tangent, axis=1)
+        bad = np.unique(np.repeat(np.arange(len(total)), total)[~((length > 0.5) & (length < 1.5))]).tolist()
+        if not bad:
+            break
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bm.faces.ensure_lookup_table()
+        bm.edges.index_update()
+        # Index order, not set order: collapse walks its input in order and
+        # keeps the first vertex of each group, so the order reaches the GLB.
+        edges = sorted({min(bm.faces[i].edges, key=lambda e: e.calc_length()) for i in bad}, key=lambda e: e.index)
+        bmesh.ops.collapse(bm, edges=edges, uvs=True)
+        ngons = [f for f in bm.faces if len(f.verts) > 3]
+        if ngons:
+            bmesh.ops.triangulate(bm, faces=ngons, quad_method="BEAUTY", ngon_method="BEAUTY")
+        bm.to_mesh(me)
+        bm.free()
+        me.validate(clean_customdata=False)
+        me.update()
+        repaired += len(bad)
+    return repaired
 
 
 def _reshade(obj, angle_deg=35.0):
@@ -264,6 +311,9 @@ def build(ctx, parts, final_objs):
                 decimate(o, r, min_edge=min_edge)
                 if ctx.character is None:
                     _reshade(o)
+                fixed = _fix_degenerate_tangents(o)
+                if fixed:
+                    log.info(f"LOD{level}: collapsed {fixed} faces with degenerate tangents in {o.name}")
                 if ctx.armature is not None and o.vertex_groups:
                     # Collapses interpolate weights: re-limit influences.
                     from rigging.worker_rig import clean_weights

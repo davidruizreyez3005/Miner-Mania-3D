@@ -2,15 +2,76 @@
 partial files are removed and an exception is raised."""
 
 import os
+import types
 
 import bpy
 
 from core import log
 from core import scene as scn
-from core.errors import PipelineError
+from core.errors import PipelineError, ToolchainError
+from utilities import tangents
 from validators.glb_inspector import GLB, GLBError
 
 INTERNAL_PREFIX = "mm_"
+
+
+class _TangentLoops:
+    """Stands in for ``Mesh.loops`` in the exporter's tangent readers, which
+    only call ``len()`` and ``foreach_get('tangent' / 'bitangent_sign')``."""
+
+    def __init__(self, tangent, sign):
+        self._data = {"tangent": tangent, "bitangent_sign": sign}
+
+    def __len__(self):
+        return len(self._data["bitangent_sign"])
+
+    def foreach_get(self, prop, out):
+        out[:] = self._data[prop].ravel()
+
+
+def install_tangent_hook():
+    """Make the glTF exporter write reproducible tangents.
+
+    The exporter calls ``Mesh.calc_tangents()``, which is not reproducible
+    above ~10k triangles (see utilities/tangents.py), then reads the loop
+    tangents in two private methods; those now read
+    ``tangents.loop_tangents`` instead. Rounding, axis conversion and vertex
+    deduplication stay the exporter's own. The exporter version is pinned and
+    checked by ``core.cli.verify_toolchain``; a changed exporter fails here.
+    """
+    from io_scene_gltf2.blender.exp import primitive_extract
+    cls = primitive_extract.PrimitiveCreator
+    if getattr(cls, "_mm_tangent_hook", False):
+        return
+    names = ("prepare_data", "_PrimitiveCreator__get_tangents", "_PrimitiveCreator__get_bitangent_signs")
+    if not all(callable(getattr(cls, n, None)) for n in names):
+        raise ToolchainError("glTF exporter internals changed: update install_tangent_hook in exporters/gltf_export.py")
+    prepare, get_tangents, get_signs = (getattr(cls, n) for n in names)
+
+    def prepare_data(self):
+        prepare(self)
+        self._mm_tangents = None
+        if self.use_tangents:
+            mesh = self.blender_mesh
+            self._mm_tangents = _TangentLoops(*tangents.loop_tangents(mesh, mesh.uv_layers.active.name))
+
+    def reading(fn):
+        def run(self):
+            loops = getattr(self, "_mm_tangents", None)
+            if loops is None:
+                return fn(self)
+            mesh = self.blender_mesh
+            self.blender_mesh = types.SimpleNamespace(loops=loops)
+            try:
+                return fn(self)
+            finally:
+                self.blender_mesh = mesh
+        return run
+
+    cls.prepare_data = prepare_data
+    cls._PrimitiveCreator__get_tangents = reading(get_tangents)
+    cls._PrimitiveCreator__get_bitangent_signs = reading(get_signs)
+    cls._mm_tangent_hook = True
 
 
 def strip_internal_props(objs):
@@ -59,6 +120,7 @@ def export_glb(path, objects, cfg, animations=False):
     if os.path.exists(path):
         os.remove(path)
     sanitize_names(objects)
+    install_tangent_hook()
     scn.select_only(objects, objects[0])
     q = int(cfg["export"]["jpeg_quality"])
     kwargs = dict(

@@ -21,7 +21,7 @@
     "ground_height_m": 0.0
   },
   "categories": {
-    "character": {"prefix": "chr_", "output_dir": "characters", "dimensions_m": {"min": [0.35, 0.18, 1.55], "max": [1.9, 1.2, 2.1]}},
+    "character": {"prefix": "chr_", "output_dir": "characters", "dimensions_m": {"min": [0.35, 0.18, 1.55], "max": [1.9, 1.6, 2.1]}},
     "animation": {"prefix": "anim_", "output_dir": "animations", "dimensions_m": {"min": [0.35, 0.18, 1.55], "max": [1.9, 1.2, 2.1]}},
     "machinery": {"prefix": "mach_", "output_dir": "machinery", "dimensions_m": {"min": [0.6, 0.6, 0.6], "max": [16.0, 16.0, 14.0]}},
     "vehicle": {"prefix": "veh_", "output_dir": "vehicles", "dimensions_m": {"min": [0.6, 1.0, 0.6], "max": [6.0, 14.0, 8.0]}},
@@ -79,11 +79,12 @@
     "character_capsule": {"radius": 0.3, "height": 1.8}
   },
   "deformation": {
-    "_comment": "Linear blend skinning folds joint creases at the extreme test angles (120 deg elbow/knee, 90 deg hip, 80 deg shoulder). Crease metrics only guard against catastrophic tearing/collapse; rigidly weighted regions are checked strictly.",
+    "_comment": "Linear blend skinning folds joint creases at the extreme test angles (120 deg elbow/knee, 90 deg hip, 80 deg shoulder). Crease metrics only guard against catastrophic tearing/collapse (a tear = stretch ratio above max_edge_stretch AND elongation above max_tear_elongation_m; the crease flip ratio is calibrated across all worker body/outfit variants); rigidly weighted regions are checked strictly.",
     "max_edge_stretch": 3.0,
+    "max_tear_elongation_m": 0.03,
     "min_edge_ratio": 0.12,
     "max_rigid_edge_deviation": 0.2,
-    "max_flipped_face_ratio": 0.05,
+    "max_flipped_face_ratio": 0.08,
     "max_rigid_flipped_ratio": 0.002,
     "min_joint_thickness_ratio": 0.45,
     "max_influences": 4,

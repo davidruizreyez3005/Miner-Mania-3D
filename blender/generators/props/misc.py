@@ -12,7 +12,7 @@ import bmesh
 from mathutils import Matrix, Vector, noise
 
 from core import config
-from utilities.meshkit import trs
+from utilities.meshkit import trs, uv_sphere
 
 from .. import kit
 
@@ -73,7 +73,7 @@ def _ore_sack(ctx):
     g = ctx.geo("sack")
     rng = ctx.rng.child("sack")
     tmp = bmesh.new()
-    bmesh.ops.create_uvsphere(tmp, u_segments=20, v_segments=12, radius=1.0)
+    uv_sphere(tmp, 20, 12, 1.0)
     off = Vector((rng.uniform(-9, 9), rng.uniform(-9, 9), rng.uniform(-9, 9)))
     for v in tmp.verts:
         d = v.co.copy()

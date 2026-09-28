@@ -178,10 +178,13 @@ def validate_character(ctx):
         if min(w.values()) < cfg["min_weight"] - 1e-6:
             stats["tiny"] += 1
         for bname, wt in w.items():
-            if wt < 0.05 or bname not in bones:
+            # Weights at the 5 % blend floor are falloff tails (e.g. a sleeve
+            # cuff following the wrist twist), not cross-region leaks; the 1 cm
+            # tolerance absorbs vertices sitting on the reach boundary.
+            if wt <= 0.05 + 1e-6 or bname not in bones:
                 continue
             b = bones[bname]
-            if _seg_dist(co[vi], b.head_local, b.tail_local) > _reach(bname):
+            if _seg_dist(co[vi], b.head_local, b.tail_local) > _reach(bname) + 0.01:
                 stats["region_leaks"] += 1
                 if len(leak_examples) < 5:
                     leak_examples.append(f"v{vi}->{bname}")
@@ -292,6 +295,13 @@ def deformation_tests(ctx, mesh, arm, weights):
         ratio = lp[ok] / lr[ok]
         stretch = float(ratio.max()) if ratio.size else 1.0
         squash = float(ratio.min()) if ratio.size else 1.0
+        # A tear needs both a large ratio and a large absolute elongation: at
+        # the extreme test angles millimetre crease edges (hem folds, the
+        # crotch point) legitimately stretch several-fold by 1-3 cm under LBS,
+        # while a mis-weighted vertex opens a gap of many centimetres.
+        elong = lp[ok] - lr[ok]
+        torn = (ratio > cfg["max_edge_stretch"]) & (elong > cfg["max_tear_elongation_m"])
+        tear = float(elong[torn].max()) if torn.any() else 0.0
         ee_ok = e[ok]
         rigid_e = rigid_v[ee_ok[:, 0]] & rigid_v[ee_ok[:, 1]] & (dom_b[ee_ok[:, 0]] == dom_b[ee_ok[:, 1]])
         rigid_ratio = ratio[rigid_e]
@@ -346,12 +356,15 @@ def deformation_tests(ctx, mesh, arm, weights):
             worst = {"stretch_at": [round(float(x), 3) for x in rest[ee[k_hi, 0]]],
                      "squash_at": [round(float(x), 3) for x in rest[ee[k_lo, 0]]]}
         rigid_flip_ratio = rigid_flips / max(1, rigid_count)
-        results[name] = {"worst": worst, "max_stretch": round(stretch, 3), "min_edge_ratio": round(squash, 3),
+        results[name] = {"worst": worst, "max_stretch": round(stretch, 3), "torn_edges": int(torn.sum()),
+                         "max_tear_m": round(tear, 4), "min_edge_ratio": round(squash, 3),
                          "rigid_edge_deviation": round(rigid_squash, 4),
                          "flipped_ratio": round(flip_ratio, 5), "rigid_flipped_ratio": round(rigid_flip_ratio, 5),
                          "joint_thickness": round(thickness, 3), "tested_vertices": int(mask_v.sum())}
-        if stretch > cfg["max_edge_stretch"]:
-            issues.append(ValidationIssue("error", "DEFORM_STRETCH", f"{name}: edge stretch {stretch:.2f} > {cfg['max_edge_stretch']}"))
+        if torn.any():
+            issues.append(ValidationIssue("error", "DEFORM_STRETCH",
+                                          f"{name}: {int(torn.sum())} edges tear (stretch > {cfg['max_edge_stretch']} and "
+                                          f"elongation up to {tear * 100:.1f} cm > {cfg['max_tear_elongation_m'] * 100:.0f} cm)"))
         if squash < cfg["min_edge_ratio"]:
             issues.append(ValidationIssue("error", "DEFORM_SQUASH", f"{name}: edge collapse {squash:.2f} < {cfg['min_edge_ratio']}"))
         if rigid_squash > cfg["max_rigid_edge_deviation"]:

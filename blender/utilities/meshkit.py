@@ -64,6 +64,31 @@ def segments_for(radius, detail=1.0, lo=6, hi=48):
     return n + (n % 2)
 
 
+def uv_sphere(bm, u_segments, v_segments, radius):
+    """Add a closed UV sphere (poles on Z) to ``bm``; returns its faces.
+
+    Drop-in for ``bmesh.ops.create_uvsphere``, which in Blender 4.5 emits its
+    faces in a different order on every run (its extrude/merge steps iterate
+    pointer-keyed hash sets), and that order ends up in the exported GLB. Same
+    vertex positions, including the ring phase with a vertex on +Y, but vertex
+    and face order are fixed, so builds stay byte-reproducible.
+    """
+    u, v = max(3, int(u_segments)), max(2, int(v_segments))
+    top = bm.verts.new((0.0, 0.0, radius))
+    rings = []
+    for i in range(1, v):
+        phi = math.pi * i / v
+        z, r = radius * math.cos(phi), radius * math.sin(phi)
+        rings.append([bm.verts.new((r * math.cos(math.pi / 2 + 2 * math.pi * j / u),
+                                    r * math.sin(math.pi / 2 + 2 * math.pi * j / u), z)) for j in range(u)])
+    bottom = bm.verts.new((0.0, 0.0, -radius))
+    faces = [bm.faces.new((top, rings[0][j], rings[0][(j + 1) % u])) for j in range(u)]
+    for upper, lower in zip(rings, rings[1:]):
+        faces += [bm.faces.new((upper[j], lower[j], lower[(j + 1) % u], upper[(j + 1) % u])) for j in range(u)]
+    faces += [bm.faces.new((bottom, rings[-1][(j + 1) % u], rings[-1][j])) for j in range(u)]
+    return faces
+
+
 # ---------------------------------------------------------------------- Geo
 
 class Geo:
@@ -194,7 +219,7 @@ class Geo:
         n = segments or segments_for(radius, lo=8, hi=32)
         r = rings or max(4, n // 2)
         tmp = bmesh.new()
-        bmesh.ops.create_uvsphere(tmp, u_segments=n, v_segments=r, radius=radius)
+        uv_sphere(tmp, n, r, radius)
         for v in tmp.verts:
             v.co = Vector((v.co.x * scale[0], v.co.y * scale[1], v.co.z * scale[2]))
         return self._append(tmp, matrix, mat, pattern_offset)

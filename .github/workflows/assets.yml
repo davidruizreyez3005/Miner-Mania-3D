@@ -77,10 +77,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -97,7 +97,7 @@ jobs:
             libsm6 libice6 libgl1 libegl1 libxxf86vm1
 
       - name: Cache pinned Blender and Godot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.TOOLS_DIR }}
           key: mm-tools-blender-4.5.14-9ba871ff-godot-4.7.2-9aa00f7a
@@ -112,7 +112,7 @@ jobs:
           grep -qF "Blender 4.5.14" <<< "$version"
 
       - name: Set up Node (Khronos glTF-Validator)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -121,9 +121,15 @@ jobs:
       - name: Install pinned glTF-Validator
         run: npm ci --prefix tools/gltf_validator
 
-      - name: Smoke build (generate, rig, animate, export, LOD, collision, validate, manifest, report)
+      # --verify-determinism: the smoke set is rebuilt in a fresh Blender process
+      # and every GLB must come out byte-identical (cheap enough for every push).
+      - name: Smoke build (generate, rig, animate, export, LOD, collision, validate, manifest, report, determinism)
         run: |
-          "$BLENDER" --background --factory-startup --python blender/build.py -- --profile smoke
+          "$BLENDER" --background --factory-startup --python blender/build.py -- --profile smoke --verify-determinism
+
+      - name: Rig gate self-test (injected skinning defects must be rejected)
+        run: |
+          "$BLENDER" --background --factory-startup --python blender/validators/selftest_rig.py
 
       - name: Validate assets (standalone re-inspection, checksums, Khronos, negative self-test)
         run: python tools/validate_assets.py --khronos --self-test
@@ -147,9 +153,13 @@ jobs:
         if: always()
         run: python tools/ci/summarize.py >> "$GITHUB_STEP_SUMMARY"
 
+      # Uploads never decide the job: the asset gates above do. A failed upload
+      # (e.g. the account's artifact storage quota) is reported loudly below.
       - name: Upload smoke reports
+        id: upload_reports
         if: always()
-        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-reports
           path: |
@@ -160,13 +170,23 @@ jobs:
           retention-days: 14
 
       - name: Upload smoke assets
-        uses: actions/upload-artifact@v4
+        id: upload_assets
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-assets
           path: assets/generated/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3
           compression-level: 1
+
+      - name: Report artifact upload problems
+        if: always() && (steps.upload_reports.outcome == 'failure' || steps.upload_assets.outcome == 'failure')
+        run: |
+          msg="Artifact upload failed (reports: ${{ steps.upload_reports.outcome }}, assets: ${{ steps.upload_assets.outcome }}); see the upload step log (e.g. artifact storage quota). The asset gates themselves passed."
+          echo "::warning title=Artifacts not uploaded::$msg"
+          echo "> [!WARNING]" >> "$GITHUB_STEP_SUMMARY"
+          echo "> $msg" >> "$GITHUB_STEP_SUMMARY"
 
   full:
     name: Full asset build
@@ -178,10 +198,10 @@ jobs:
       artifact: generated-assets
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -198,7 +218,7 @@ jobs:
             libsm6 libice6 libgl1 libegl1 libxxf86vm1
 
       - name: Cache pinned Blender and Godot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.TOOLS_DIR }}
           key: mm-tools-blender-4.5.14-9ba871ff-godot-4.7.2-9aa00f7a
@@ -213,7 +233,7 @@ jobs:
           grep -qF "Blender 4.5.14" <<< "$version"
 
       - name: Set up Node (Khronos glTF-Validator)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -251,8 +271,10 @@ jobs:
         run: python tools/ci/summarize.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload reports
+        id: upload_reports
         if: always()
-        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
         with:
           name: asset-reports
           path: |
@@ -263,7 +285,9 @@ jobs:
           retention-days: 30
 
       - name: Upload generated assets
-        uses: actions/upload-artifact@v4
+        id: upload_assets
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
         with:
           name: generated-assets
           path: |
@@ -272,3 +296,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 1
+
+      - name: Report artifact upload problems
+        if: always() && (steps.upload_reports.outcome == 'failure' || steps.upload_assets.outcome == 'failure')
+        run: |
+          msg="Artifact upload failed (reports: ${{ steps.upload_reports.outcome }}, assets: ${{ steps.upload_assets.outcome }}); see the upload step log (e.g. artifact storage quota). The asset gates themselves passed."
+          echo "::warning title=Artifacts not uploaded::$msg"
+          echo "> [!WARNING]" >> "$GITHUB_STEP_SUMMARY"
+          echo "> $msg" >> "$GITHUB_STEP_SUMMARY"

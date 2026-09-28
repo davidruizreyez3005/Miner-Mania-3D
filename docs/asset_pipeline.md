@@ -227,7 +227,16 @@ collision; the manifest lists them under `states`.
 ## Validation layers
 
 1. **In-build checks** - geometry, UVs, origins, scale, budgets, rig and
-   deformation, animation contacts/loops/grips, collision.
+   deformation, animation contacts/loops/grips, collision. Characters are
+   posed at extreme test angles (80 deg shoulder raise, 120 deg elbow and
+   knee, 90 deg hip flexion, wrist, ankle, spine twist): an edge *tears* when
+   it stretches more than 3x **and** opens by more than 3 cm, rigidly weighted
+   regions must stay rigid (0.2 % flipped faces max), crease regions may fold
+   (8 % max), joints must keep 45 % of their thickness; weights are limited to
+   4 influences, normalised, symmetric and free of cross-region leaks.
+   `blender/validators/selftest_rig.py` injects skinning defects (a torn shin
+   patch, a cross-body weight, an unweighted vertex, five influences) into
+   the smoke worker and fails unless each is rejected (run in CI).
 2. **Post-export inspection** (`blender/validators/glb_inspector.py`) - the
    exported bytes: GLB structure, references and accessors, finite data,
    normals/tangents, skin and inverse bind matrices, bone hierarchy, clips
@@ -265,9 +274,31 @@ Manifests contain no timestamps; the same sources produce the same bytes.
 ## Determinism
 
 Every definition carries an explicit seed; all randomness flows from a
-seeded RNG derived per asset and part; Blender runs with
+seeded RNG derived per asset and part (SHA-256 based, so it does not depend
+on Python's per-process string hashing); Blender runs with
 `--factory-startup`; exports and manifests are sorted. `--verify-determinism`
-rebuilds into a second output root and requires identical GLB bytes.
+rebuilds the selection in a fresh Blender process into a second output root
+and requires identical GLB bytes; the CI smoke job runs it on every push, and
+the full job on request (`verify_determinism` dispatch input).
+
+Three rules keep that true:
+
+- **Never let set order reach the output.** Blender's embedded Python
+  randomizes `str` hashes per process and ignores `PYTHONHASHSEED`, so
+  iterating a `set` of names (bones, parts, materials) gives a different
+  order in every build. Use ordered unions (`list(a) + [k for k in b if k not
+  in a]`) or `sorted(...)`; sets are fine for membership tests.
+- **Do not use `bmesh.ops.create_uvsphere`.** In Blender 4.5 it emits its
+  faces in a different order on every run. `meshkit.uv_sphere()` builds the
+  identical sphere (same vertex positions) in a fixed order.
+- **Tangents come from `utilities/tangents.py`.** Blender 4.5 runs MikkTSpace
+  multi-threaded above ~10k triangles and the tangents then change by ~1e-7
+  on every call, which the exporter's 4-decimal rounding and the 8-bit normal
+  maps make visible. The glTF export (a hook on the pinned exporter's tangent
+  readers) and the tangent-space normal bake compute tangents on chunks of
+  whole connected components below 8000 triangles, which reproduces the
+  single-threaded result exactly; a single connected surface above that size
+  fails the build.
 
 ## Continuous integration
 
@@ -276,9 +307,10 @@ rebuilds into a second output root and requires identical GLB bytes.
 
 1. **smoke** job - checkout, Python + hash-pinned dependencies, system
    libraries, cached and checksum-verified Blender (version asserted), Node
-   + pinned validator, smoke build, standalone validation with Khronos and
-   the self-test, pinned Godot import and validation, job summary, reports
-   and assets uploaded.
+   + pinned validator, smoke build with the determinism rebuild, the rig
+   gate self-test, standalone validation with Khronos and the self-test,
+   pinned Godot import and validation, job summary, reports and assets
+   uploaded.
 2. **full** job - runs only after the smoke job passes (skipped for
    `profile: smoke`): the whole library (optionally with the determinism
    rebuild), the same validation chain, and the `generated-assets` and

@@ -99,7 +99,7 @@ def stage_animate(ctx):
         machine_anim.bake_clips(ctx)
 
 
-def _clean_parts(parts):
+def _clean_parts(parts, dcfg=None):
     import bmesh
     from utilities.meshkit import apply_modifiers
     for o in parts:
@@ -135,6 +135,11 @@ def _clean_parts(parts):
         bm.free()
         o.data.validate(clean_customdata=False)     # the exporter would otherwise fix it silently
         o.data.update()
+        if dcfg is not None and o.vertex_groups and any(m.type == "ARMATURE" for m in o.modifiers):
+            # Edge collapses interpolate skin weights: restore the influence
+            # limit, minimum weight and normalisation the rig stage guaranteed.
+            from rigging.worker_rig import clean_weights
+            clean_weights(o, dcfg["max_influences"], dcfg["min_weight"])
 
 
 def _split_non_baked(parts):
@@ -168,7 +173,7 @@ def stage_optimize(ctx):
     from materials import baking, uv
     t0 = time.time()
     parts = [o for o in ctx.objects if o.type == "MESH"]
-    _clean_parts(parts)
+    _clean_parts(parts, ctx.cfg["deformation"])
     parts = _split_non_baked(parts)
     t_clean = time.time() - t0
     baked = [o for o in parts if any(s.material is not None and s.material.get("mm_baked", True)
@@ -194,6 +199,14 @@ def stage_optimize(ctx):
         if stats["overlap_ratio"] <= ctx.cfg["uv"]["max_overlap_ratio"] or attempt == 2:
             break
         log.info(f"UV overlap {stats['overlap_ratio']} at a {limit:.0f} deg angle limit; re-unwrapping tighter")
+    # A face with (near) zero UV area or a normal in its own plane gets a zero
+    # MikkTSpace tangent in the export; collapse it before baking so the maps
+    # are baked on exactly the exported triangles.
+    from exporters.lod import _fix_degenerate_tangents
+    fixed = sum(_fix_degenerate_tangents(o) for o in baked)
+    if fixed:
+        log.info(f"collapsed {fixed} faces with degenerate tangents before baking")
+        stats = uv.uv_stats(baked, ctx.texture_size)
     ctx.uv_stats = stats
     ctx.metadata["uv_angle_limit_deg"] = limit
     t_uv = time.time() - t1

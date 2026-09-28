@@ -112,6 +112,7 @@ func _check_entry(entry: Dictionary) -> void:
 		"animations": entry.get("animations", []),
 		"loops": loops,
 		"textured": true,
+		"humanoid": humanoid,
 	}
 	_check_scene(entry["id"], entry["model"], main_spec)
 	if entry.get("type", "") == "character" and entry.get("skeleton", false) and not entry.get("animations", []).is_empty():
@@ -135,7 +136,7 @@ func _check_entry(entry: Dictionary) -> void:
 	var clips: Dictionary = entry.get("clip_models", {})
 	for clip_name in clips:
 		_check_scene(entry["id"], clips[clip_name], {"bones": main_spec["bones"], "animations": [clip_name], "loops": loops,
-			"textured": false})
+			"textured": false, "humanoid": humanoid})
 		_library_scenes.append("res://" + clips[clip_name])
 	if entry.get("type", "") == "animation":
 		_library_scenes.append("res://" + entry["model"])
@@ -169,6 +170,7 @@ func _check_scene(asset_id: String, rel_path: String, spec: Dictionary) -> void:
 	# Clip expectations follow the build's per-file contract (e.g. character
 	# LODs are skin-only and borrow the main model's clips).
 	var exp: Dictionary = _expect.get(rel_path, {}).get("expect", {})
+	spec["origin"] = exp.get("origin", "any")
 	if exp.is_empty():
 		r["errors"].append("no build expectations recorded for this file")
 	elif exp.get("no_animations", false):
@@ -228,8 +230,18 @@ func _check_scene(asset_id: String, rel_path: String, spec: Dictionary) -> void:
 			if absf(got[i] - expect[i]) > DIM_TOL_ABS + DIM_TOL_REL * expect[i]:
 				r["errors"].append("bounds %s differ from manifest %s (axis conversion or scale)" % [got, expect])
 				break
-		if aabb.position.y < -0.5 * got.y - 0.05:
-			r["errors"].append("model hangs below its origin (%s)" % aabb)
+		# Origin policy (same rules as the build's inspector, Godot Y = Blender Z).
+		var origin: String = spec.get("origin", "any")
+		var lo := aabb.position.y
+		var hi := aabb.end.y
+		if origin == "base" and absf(lo) > maxf(0.02, 0.02 * got.y):
+			r["errors"].append("origin policy base: lowest point y=%.3f is not on the origin" % lo)
+		elif origin == "embedded" and not (-0.4 * got.y <= lo and lo <= 0.01):
+			r["errors"].append("origin policy embedded: base y=%.3f out of range" % lo)
+		elif origin == "tile" and not (-0.5 <= lo and lo <= 0.01):
+			r["errors"].append("origin policy tile: skirt bottom y=%.3f out of range" % lo)
+		elif origin == "ceiling" and absf(hi) > maxf(0.02, 0.02 * got.y):
+			r["errors"].append("origin policy ceiling: highest point y=%.3f is not on the mount" % hi)
 	# Sockets.
 	for sock in spec.get("sockets", []):
 		var node := inst.find_child("socket_" + sock["name"], true, false)
@@ -256,7 +268,8 @@ func _check_scene(asset_id: String, rel_path: String, spec: Dictionary) -> void:
 		if players.size() != 1:
 			r["errors"].append("expected one AnimationPlayer, found %d" % players.size())
 		else:
-			_check_animations(r, players[0], wanted, spec.get("allowed", wanted), spec.get("loops", {}), skels)
+			_check_animations(r, players[0], wanted, spec.get("allowed", wanted), spec.get("loops", {}), skels,
+				spec.get("humanoid", false))
 	elif not players.is_empty():
 		var extra := []
 		for p in players:
@@ -269,7 +282,7 @@ func _check_scene(asset_id: String, rel_path: String, spec: Dictionary) -> void:
 
 
 func _check_animations(r: Dictionary, player: AnimationPlayer, wanted: Array, allowed: Array, loops: Dictionary,
-		skels: Array) -> void:
+		skels: Array, humanoid: bool) -> void:
 	var have := []
 	for a in player.get_animation_list():
 		if String(a) != "RESET":
@@ -301,14 +314,29 @@ func _check_animations(r: Dictionary, player: AnimationPlayer, wanted: Array, al
 		if not unbound.is_empty():
 			r["errors"].append("clip %s has %d unbound tracks, e.g. %s" % [name, unbound.size(), unbound[0]])
 		player.play(name)
-		player.seek(anim.length * 0.5, true)
-		if skel != null:
+		var samples := []
+		for f in [0.0, 0.33, 0.5, 0.66]:
+			player.seek(anim.length * f, true)
+			if skel == null:
+				continue
+			var pose := []
 			for b in skel.get_bone_count():
 				var q := skel.get_bone_pose_rotation(b)
 				var t := skel.get_bone_pose_position(b)
 				if not (q.is_finite() and t.is_finite()):
 					r["errors"].append("clip %s produced a non-finite pose on %s" % [name, skel.get_bone_name(b)])
 					break
+				pose.append(q)
+			samples.append(pose)
+		# Humanoid clips must actually move the skeleton (a broken export often
+		# imports as a frozen pose); machine Idle clips are static by design.
+		if humanoid and samples.size() == 4 and not samples[0].is_empty():
+			var motion := 0.0
+			for i in range(1, samples.size()):
+				for b in samples[0].size():
+					motion = maxf(motion, (samples[0][b] as Quaternion).angle_to(samples[i][b]))
+			if motion < deg_to_rad(0.5):
+				r["errors"].append("clip %s does not move the skeleton (max %.2f deg)" % [name, rad_to_deg(motion)])
 		player.stop()
 		checked += 1
 	r["info"]["clips_checked"] = checked
