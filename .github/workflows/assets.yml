@@ -67,7 +67,6 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "22"
-  TOOLS_DIR: ${{ github.workspace }}/../mm-tools
   PYTHONUNBUFFERED: "1"
 
 jobs:
@@ -95,6 +94,11 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends \
             libx11-6 libxrender1 libxfixes3 libxi6 libxkbcommon0 libxcb1 libxext6 \
             libsm6 libice6 libgl1 libegl1 libxxf86vm1
+
+      # Outside the checkout (Godot would import it), as an absolute path:
+      # actions/cache rejects paths containing '..'.
+      - name: Resolve tools directory
+        run: echo "TOOLS_DIR=$(realpath -m "$GITHUB_WORKSPACE/../mm-tools")" >> "$GITHUB_ENV"
 
       - name: Cache pinned Blender and Godot
         uses: actions/cache@v6
@@ -216,6 +220,11 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends \
             libx11-6 libxrender1 libxfixes3 libxi6 libxkbcommon0 libxcb1 libxext6 \
             libsm6 libice6 libgl1 libegl1 libxxf86vm1
+
+      # Outside the checkout (Godot would import it), as an absolute path:
+      # actions/cache rejects paths containing '..'.
+      - name: Resolve tools directory
+        run: echo "TOOLS_DIR=$(realpath -m "$GITHUB_WORKSPACE/../mm-tools")" >> "$GITHUB_ENV"
 
       - name: Cache pinned Blender and Godot
         uses: actions/cache@v6
