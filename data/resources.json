@@ -1,0 +1,600 @@
+{
+ "_comment": "Resource definitions. Every resource is mined raw from nodes and refined through an ordered chain of processing steps (facility ids). An item stops at the first step whose facility is not built. Values are dollars per unit; 'value_mult' is applied cumulatively per step. New resources are added here only (plus a node asset).",
+ "schema": 1,
+ "rarities": {
+  "common": {
+   "name": "Common",
+   "color": "#B8B2A7",
+   "discovery_weight": 1.0
+  },
+  "uncommon": {
+   "name": "Uncommon",
+   "color": "#6FCF6A",
+   "discovery_weight": 0.6
+  },
+  "rare": {
+   "name": "Rare",
+   "color": "#4FA8FF",
+   "discovery_weight": 0.3
+  },
+  "very_rare": {
+   "name": "Very Rare",
+   "color": "#C77DFF",
+   "discovery_weight": 0.12
+  },
+  "exotic": {
+   "name": "Exotic",
+   "color": "#FF9F1C",
+   "discovery_weight": 0.05
+  }
+ },
+ "resources": [
+  {
+   "id": "stone",
+   "name": "Stone",
+   "rarity": "common",
+   "value": 1.0,
+   "extraction_difficulty": 1.0,
+   "unlock_depth": 1,
+   "visual_material": "stone_gray",
+   "node_asset": "res_ore_stone_01",
+   "color": "#9A948C",
+   "production_modifier": 1.15,
+   "market": {
+    "amplitude": 0.05,
+    "period_s": 900,
+    "phase": 0.0
+   },
+   "description": "Plain host rock. Worth little raw, but crushed aggregate always sells.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "stone_aggregate",
+     "name": "Crushed Aggregate",
+     "value_mult": 2.5
+    }
+   ]
+  },
+  {
+   "id": "coal",
+   "name": "Coal",
+   "rarity": "common",
+   "value": 3.0,
+   "extraction_difficulty": 1.1,
+   "unlock_depth": 1,
+   "visual_material": "coal",
+   "node_asset": "res_ore_coal_01",
+   "color": "#2B2B2E",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.12,
+    "period_s": 1200,
+    "phase": 1.3
+   },
+   "description": "Black seams of bituminous coal. Fuel for the whole valley.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "coal_crushed",
+     "name": "Crushed Coal",
+     "value_mult": 1.5
+    },
+    {
+     "facility": "washer",
+     "product": "coal_washed",
+     "name": "Washed Coal",
+     "value_mult": 1.6
+    }
+   ]
+  },
+  {
+   "id": "copper",
+   "name": "Copper",
+   "rarity": "common",
+   "value": 7.0,
+   "extraction_difficulty": 1.25,
+   "unlock_depth": 1,
+   "visual_material": "copper_ore",
+   "node_asset": "res_ore_copper_01",
+   "color": "#2F8A74",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.1,
+    "period_s": 1500,
+    "phase": 2.1
+   },
+   "description": "Green-stained malachite and chalcopyrite veins.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "copper_crushed",
+     "name": "Crushed Copper Ore",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "washer",
+     "product": "copper_concentrate",
+     "name": "Copper Concentrate",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "smelter",
+     "product": "copper_ingot",
+     "name": "Copper Ingot",
+     "value_mult": 2.4
+    }
+   ]
+  },
+  {
+   "id": "iron",
+   "name": "Iron",
+   "rarity": "common",
+   "value": 36.0,
+   "extraction_difficulty": 1.35,
+   "unlock_depth": 2,
+   "visual_material": "iron_ore",
+   "node_asset": "res_ore_iron_01",
+   "color": "#7A4632",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.08,
+    "period_s": 1800,
+    "phase": 0.7
+   },
+   "description": "Rust-red hematite. The backbone of industry.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "iron_crushed",
+     "name": "Crushed Iron Ore",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "smelter",
+     "product": "iron_ingot",
+     "name": "Iron Ingot",
+     "value_mult": 2.6
+    }
+   ]
+  },
+  {
+   "id": "silver",
+   "name": "Silver",
+   "rarity": "uncommon",
+   "value": 180.0,
+   "extraction_difficulty": 1.8,
+   "unlock_depth": 3,
+   "visual_material": "silver_ore",
+   "node_asset": "res_ore_silver_01",
+   "color": "#CDD1D6",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.15,
+    "period_s": 2100,
+    "phase": 4.0
+   },
+   "description": "Argentite veins glinting in the lamp light.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "silver_crushed",
+     "name": "Crushed Silver Ore",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "washer",
+     "product": "silver_concentrate",
+     "name": "Silver Concentrate",
+     "value_mult": 1.5
+    },
+    {
+     "facility": "smelter",
+     "product": "silver_bar",
+     "name": "Silver Bar",
+     "value_mult": 2.4
+    }
+   ]
+  },
+  {
+   "id": "quartz",
+   "name": "Quartz",
+   "rarity": "uncommon",
+   "value": 260.0,
+   "extraction_difficulty": 1.6,
+   "unlock_depth": 3,
+   "visual_material": "quartz",
+   "node_asset": "res_crystal_quartz_01",
+   "color": "#EDE7DA",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.1,
+    "period_s": 1600,
+    "phase": 3.3
+   },
+   "description": "Milky and clear quartz crystal pockets. Prized by electronics makers.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "quartz_crushed",
+     "name": "Crushed Quartz",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "sorter",
+     "product": "quartz_graded",
+     "name": "Graded Quartz",
+     "value_mult": 2.0
+    }
+   ]
+  },
+  {
+   "id": "gold",
+   "name": "Gold",
+   "rarity": "uncommon",
+   "value": 500.0,
+   "extraction_difficulty": 2.2,
+   "unlock_depth": 3,
+   "visual_material": "gold_metal",
+   "node_asset": "res_ore_gold_01",
+   "color": "#E6B436",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.18,
+    "period_s": 2400,
+    "phase": 5.1
+   },
+   "description": "Gold-bearing quartz reef with visible nuggets.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "gold_crushed",
+     "name": "Crushed Gold Ore",
+     "value_mult": 1.5
+    },
+    {
+     "facility": "washer",
+     "product": "gold_concentrate",
+     "name": "Gold Concentrate",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "smelter",
+     "product": "gold_bar",
+     "name": "Gold Bar",
+     "value_mult": 2.5
+    }
+   ]
+  },
+  {
+   "id": "platinum",
+   "name": "Platinum",
+   "rarity": "rare",
+   "value": 3400.0,
+   "extraction_difficulty": 2.8,
+   "unlock_depth": 4,
+   "visual_material": "platinum_ore",
+   "node_asset": "res_ore_platinum_01",
+   "color": "#E5E4E2",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.2,
+    "period_s": 2700,
+    "phase": 0.4
+   },
+   "description": "Dense grey sperrylite. Every gram counts.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "platinum_crushed",
+     "name": "Crushed Platinum Ore",
+     "value_mult": 1.5
+    },
+    {
+     "facility": "washer",
+     "product": "platinum_concentrate",
+     "name": "Platinum Concentrate",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "smelter",
+     "product": "platinum_matte",
+     "name": "Platinum Matte",
+     "value_mult": 2.0
+    },
+    {
+     "facility": "refinery",
+     "product": "platinum_refined",
+     "name": "Refined Platinum",
+     "value_mult": 2.2
+    }
+   ]
+  },
+  {
+   "id": "emerald",
+   "name": "Emerald",
+   "rarity": "rare",
+   "value": 5000.0,
+   "extraction_difficulty": 2.6,
+   "unlock_depth": 4,
+   "visual_material": "emerald",
+   "node_asset": "res_gem_emerald_01",
+   "color": "#1FAF6B",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.22,
+    "period_s": 3000,
+    "phase": 2.6
+   },
+   "description": "Deep green beryl crystals in dark schist.",
+   "processing": [
+    {
+     "facility": "washer",
+     "product": "emerald_rough",
+     "name": "Rough Emerald",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "sorter",
+     "product": "emerald_graded",
+     "name": "Graded Emerald",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "refinery",
+     "product": "emerald_cut",
+     "name": "Cut Emerald",
+     "value_mult": 2.6
+    }
+   ]
+  },
+  {
+   "id": "amethyst",
+   "name": "Amethyst",
+   "rarity": "rare",
+   "value": 16000.0,
+   "extraction_difficulty": 2.3,
+   "unlock_depth": 5,
+   "visual_material": "amethyst",
+   "node_asset": "res_crystal_amethyst_01",
+   "color": "#8C52CC",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.18,
+    "period_s": 2200,
+    "phase": 1.9
+   },
+   "description": "Faintly glowing violet geodes from the crystal caverns.",
+   "processing": [
+    {
+     "facility": "washer",
+     "product": "amethyst_rough",
+     "name": "Rough Amethyst",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "sorter",
+     "product": "amethyst_graded",
+     "name": "Graded Amethyst",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "refinery",
+     "product": "amethyst_polished",
+     "name": "Polished Amethyst",
+     "value_mult": 2.4
+    }
+   ]
+  },
+  {
+   "id": "ruby",
+   "name": "Ruby",
+   "rarity": "rare",
+   "value": 28000.0,
+   "extraction_difficulty": 2.8,
+   "unlock_depth": 5,
+   "visual_material": "ruby",
+   "node_asset": "res_gem_ruby_01",
+   "color": "#D7263D",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.22,
+    "period_s": 3300,
+    "phase": 4.4
+   },
+   "description": "Blood-red corundum in marble lenses.",
+   "processing": [
+    {
+     "facility": "washer",
+     "product": "ruby_rough",
+     "name": "Rough Ruby",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "sorter",
+     "product": "ruby_graded",
+     "name": "Graded Ruby",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "refinery",
+     "product": "ruby_cut",
+     "name": "Cut Ruby",
+     "value_mult": 2.7
+    }
+   ]
+  },
+  {
+   "id": "sapphire",
+   "name": "Sapphire",
+   "rarity": "rare",
+   "value": 32000.0,
+   "extraction_difficulty": 3.0,
+   "unlock_depth": 5,
+   "visual_material": "sapphire",
+   "node_asset": "res_gem_sapphire_01",
+   "color": "#2A5BD7",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.22,
+    "period_s": 3600,
+    "phase": 0.9
+   },
+   "description": "Cornflower-blue corundum crystals.",
+   "processing": [
+    {
+     "facility": "washer",
+     "product": "sapphire_rough",
+     "name": "Rough Sapphire",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "sorter",
+     "product": "sapphire_graded",
+     "name": "Graded Sapphire",
+     "value_mult": 1.6
+    },
+    {
+     "facility": "refinery",
+     "product": "sapphire_cut",
+     "name": "Cut Sapphire",
+     "value_mult": 2.7
+    }
+   ]
+  },
+  {
+   "id": "uranium",
+   "name": "Uranium",
+   "rarity": "very_rare",
+   "value": 220000.0,
+   "extraction_difficulty": 3.4,
+   "unlock_depth": 6,
+   "visual_material": "uranium",
+   "node_asset": "res_ore_uranium_01",
+   "color": "#78E83A",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.25,
+    "period_s": 4000,
+    "phase": 3.8
+   },
+   "description": "Pitchblende with glowing autunite crystals. Handle with care.",
+   "processing": [
+    {
+     "facility": "crusher",
+     "product": "uranium_crushed",
+     "name": "Crushed Pitchblende",
+     "value_mult": 1.5
+    },
+    {
+     "facility": "washer",
+     "product": "uranium_leached",
+     "name": "Leached Uranium",
+     "value_mult": 1.5
+    },
+    {
+     "facility": "refinery",
+     "product": "uranium_yellowcake",
+     "name": "Yellowcake",
+     "value_mult": 2.6
+    }
+   ]
+  },
+  {
+   "id": "diamond",
+   "name": "Diamond",
+   "rarity": "very_rare",
+   "value": 400000.0,
+   "extraction_difficulty": 4.0,
+   "unlock_depth": 6,
+   "visual_material": "diamond",
+   "node_asset": "res_gem_diamond_01",
+   "color": "#D4F1FF",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.25,
+    "period_s": 4500,
+    "phase": 5.6
+   },
+   "description": "Clear octahedral crystals in blue kimberlite.",
+   "processing": [
+    {
+     "facility": "washer",
+     "product": "diamond_rough",
+     "name": "Rough Diamond",
+     "value_mult": 1.4
+    },
+    {
+     "facility": "sorter",
+     "product": "diamond_graded",
+     "name": "Graded Diamond",
+     "value_mult": 1.8
+    },
+    {
+     "facility": "refinery",
+     "product": "diamond_brilliant",
+     "name": "Brilliant-Cut Diamond",
+     "value_mult": 3.0
+    }
+   ]
+  },
+  {
+   "id": "voidstone",
+   "name": "Voidstone",
+   "rarity": "exotic",
+   "value": 4000000.0,
+   "extraction_difficulty": 5.0,
+   "unlock_depth": 7,
+   "visual_material": "voidstone",
+   "node_asset": "res_exotic_voidstone_01",
+   "color": "#29E0D2",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.3,
+    "period_s": 5000,
+    "phase": 2.2
+   },
+   "description": "An impossible, faintly humming mineral from the Abyss.",
+   "processing": [
+    {
+     "facility": "sorter",
+     "product": "voidstone_graded",
+     "name": "Graded Voidstone",
+     "value_mult": 1.8
+    },
+    {
+     "facility": "refinery",
+     "product": "voidstone_stabilised",
+     "name": "Stabilised Voidstone",
+     "value_mult": 3.2
+    }
+   ]
+  },
+  {
+   "id": "aether",
+   "name": "Aether Anomaly",
+   "rarity": "exotic",
+   "value": 60000000.0,
+   "extraction_difficulty": 6.0,
+   "unlock_depth": 8,
+   "visual_material": "aether",
+   "node_asset": "res_exotic_aether_01",
+   "color": "#FF4FD8",
+   "production_modifier": 1.0,
+   "market": {
+    "amplitude": 0.35,
+    "period_s": 6000,
+    "phase": 0.0
+   },
+   "description": "A pulsing crystalline anomaly at the heart of the mountain.",
+   "requires_prestige": 1,
+   "processing": [
+    {
+     "facility": "refinery",
+     "product": "aether_core",
+     "name": "Aether Core",
+     "value_mult": 4.0
+    }
+   ]
+  }
+ ]
+}

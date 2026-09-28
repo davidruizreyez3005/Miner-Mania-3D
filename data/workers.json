@@ -1,0 +1,305 @@
+{
+ "_comment": "Worker roles. Every hired worker has a post (home assignment); the workforce system turns posts + production needs into jobs. Variants are generated character assets sharing the humanoid_worker_v1 skeleton. Rates are per worker at level 1 before modifiers. hire_cost(n) = base_cost * growth^n where n = workers of that role already employed.",
+ "schema": 1,
+ "max_level": 10,
+ "xp_per_level_s": 600,
+ "level_bonus": 0.06,
+ "energy": {
+  "work_drain_per_s": 0.004,
+  "rest_recover_per_s": 0.05,
+  "rest_threshold": 0.0,
+  "resume_threshold": 1.0
+ },
+ "travel": {
+  "walk_mps": 2.6,
+  "lift_wait_s": 3.0,
+  "carry_mps": 1.8
+ },
+ "roles": [
+  {
+   "id": "miner",
+   "name": "Miner",
+   "plural": "Miners",
+   "base_cost": 20,
+   "growth": 1.32,
+   "variants": [
+    "chr_worker_miner_01",
+    "chr_worker_miner_02"
+   ],
+   "posts": [
+    "depth"
+   ],
+   "stats": {
+    "rate": 1.0
+   },
+   "unlock": {},
+   "description": "Works the rock face at a depth. Output scales with Mining Operations and tooling."
+  },
+  {
+   "id": "hauler",
+   "name": "Hauler",
+   "plural": "Haulers",
+   "base_cost": 45,
+   "growth": 1.34,
+   "variants": [
+    "chr_worker_hauler_01",
+    "chr_worker_hauler_02"
+   ],
+   "posts": [
+    "depth"
+   ],
+   "stats": {
+    "rate": 0.9
+   },
+   "unlock": {
+    "quest": "q_first_miner"
+   },
+   "description": "Carries ore from the face to the shaft station. Each hauler moves about one miner's output."
+  },
+  {
+   "id": "operator",
+   "name": "Operator",
+   "plural": "Operators",
+   "base_cost": 120,
+   "growth": 1.45,
+   "variants": [
+    "chr_worker_operator_01",
+    "chr_worker_operator_02"
+   ],
+   "posts": [
+    "headframe",
+    "crusher",
+    "washer",
+    "sorter",
+    "smelter",
+    "refinery"
+   ],
+   "stats": {
+    "rate": 1.0
+   },
+   "unlock": {},
+   "description": "Runs the lift automatically, or keeps a processing machine at full speed."
+  },
+  {
+   "id": "mechanic",
+   "name": "Mechanic",
+   "plural": "Mechanics",
+   "base_cost": 900,
+   "growth": 1.5,
+   "variants": [
+    "chr_worker_mechanic_01",
+    "chr_worker_mechanic_02"
+   ],
+   "posts": [
+    "workshop"
+   ],
+   "stats": {
+    "repair_per_s": 0.035
+   },
+   "unlock": {
+    "facility": "workshop"
+   },
+   "description": "Walks to worn machines and repairs them. Worn machines run slower."
+  },
+  {
+   "id": "engineer",
+   "name": "Engineer",
+   "plural": "Engineers",
+   "base_cost": 250,
+   "growth": 1.55,
+   "variants": [
+    "chr_worker_engineer_01",
+    "chr_worker_engineer_02"
+   ],
+   "posts": [
+    "office"
+   ],
+   "stats": {
+    "research_per_s": 0.35
+   },
+   "unlock": {
+    "quest": "q_first_research"
+   },
+   "description": "Produces research points at the site office."
+  },
+  {
+   "id": "geologist",
+   "name": "Geologist",
+   "plural": "Geologists",
+   "base_cost": 3000,
+   "growth": 1.6,
+   "variants": [
+    "chr_worker_geologist_01",
+    "chr_worker_geologist_02"
+   ],
+   "posts": [
+    "depth"
+   ],
+   "stats": {
+    "rare_bonus": 0.6,
+    "regen_bonus": 0.35
+   },
+   "unlock": {
+    "tech": "field_geology"
+   },
+   "description": "Surveys a depth: rarer veins and faster vein discovery."
+  },
+  {
+   "id": "supervisor",
+   "name": "Supervisor",
+   "plural": "Supervisors",
+   "base_cost": 400,
+   "growth": 1.7,
+   "variants": [
+    "chr_worker_supervisor_01",
+    "chr_worker_supervisor_02"
+   ],
+   "posts": [
+    "office",
+    "depth",
+    "plant"
+   ],
+   "stats": {
+    "area_bonus": 0.15
+   },
+   "unlock": {
+    "quest": "q_sell_goods"
+   },
+   "description": "At the office: sales manager (trucks leave automatically). At a depth or the plant: +15% crew efficiency."
+  }
+ ],
+ "post_limits": {
+  "depth": {
+   "miner": "mining.miner_slots",
+   "hauler": "haulage.hauler_slots",
+   "geologist": 1,
+   "supervisor": 1
+  },
+  "headframe": {
+   "operator": 1
+  },
+  "crusher": {
+   "operator": 1
+  },
+  "washer": {
+   "operator": 1
+  },
+  "sorter": {
+   "operator": 1
+  },
+  "smelter": {
+   "operator": 1
+  },
+  "refinery": {
+   "operator": 1
+  },
+  "workshop": {
+   "mechanic": "workshop.mechanic_slots"
+  },
+  "office": {
+   "engineer": "office.engineer_slots",
+   "supervisor": 1
+  },
+  "plant": {
+   "supervisor": 1
+  }
+ },
+ "names": {
+  "first": [
+   "Gus",
+   "Mae",
+   "Ottis",
+   "Rosa",
+   "Hank",
+   "Ivy",
+   "Dmitri",
+   "Lena",
+   "Buck",
+   "Nora",
+   "Emil",
+   "Tess",
+   "Walt",
+   "Juno",
+   "Rufus",
+   "Ada",
+   "Cyrus",
+   "Greta",
+   "Silas",
+   "Opal",
+   "Ike",
+   "Vera",
+   "Amos",
+   "Pearl",
+   "Levi",
+   "Hattie",
+   "Moe",
+   "Dot",
+   "Kofi",
+   "Ines",
+   "Tomas",
+   "Yara",
+   "Bram",
+   "Sunny",
+   "Hugo",
+   "Marta",
+   "Rex",
+   "Lupe",
+   "Otto",
+   "Wren"
+  ],
+  "last": [
+   "Miller",
+   "Stone",
+   "Coalman",
+   "Barrow",
+   "Pickett",
+   "Hollis",
+   "Kane",
+   "Rourke",
+   "Vance",
+   "Delgado",
+   "Novak",
+   "Okafor",
+   "Brandt",
+   "Castillo",
+   "Lindqvist",
+   "Tanaka",
+   "McRae",
+   "Duval",
+   "Petrov",
+   "Asante",
+   "Holm",
+   "Quarry",
+   "Flint",
+   "Copperfield",
+   "Ashby",
+   "Rook",
+   "Slate",
+   "Gault",
+   "Hardy",
+   "Pike"
+  ],
+  "nicknames": [
+   "Rocky",
+   "Dusty",
+   "Sparks",
+   "Lucky",
+   "Boomer",
+   "Slim",
+   "Shorty",
+   "Doc",
+   "Ace",
+   "Moose",
+   "Flash",
+   "Chip",
+   "Nugget",
+   "Grit",
+   "Tank",
+   "Pebble",
+   "Hammer",
+   "Wick",
+   "Rusty",
+   "Blaze"
+  ]
+ }
+}

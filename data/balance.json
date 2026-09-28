@@ -1,0 +1,104 @@
+{
+ "_comment": "Global simulation constants. All gameplay numbers that are not per-content live here.",
+ "schema": 1,
+ "sim": {
+  "tick_s": 0.1,
+  "job_interval_s": 1.0,
+  "objective_interval_s": 0.5,
+  "income_window_s": 60,
+  "autosave_s": 30
+ },
+ "start": {
+  "money": 0,
+  "region": "timberline_valley",
+  "seed": 20260928
+ },
+ "manual": {
+  "swing_yield": 1.0,
+  "lift_trip_bonus_s": 0.0,
+  "max_queued_swings": 6
+ },
+ "rally": {
+  "mult": 2.0,
+  "duration_s": 45,
+  "cooldown_s": 240,
+  "unlock_quest": "q_first_miner"
+ },
+ "offline": {
+  "base_cap_h": 2.0,
+  "max_cap_h": 24.0,
+  "base_efficiency": 0.6,
+  "max_efficiency": 1.0,
+  "min_away_s": 60,
+  "min_step_s": 1.0,
+  "max_step_s": 30.0,
+  "target_steps": 1200,
+  "future_tolerance_s": 120
+ },
+ "face": {
+  "buffer_s": 30.0,
+  "min_capacity": 10.0,
+  "self_haul_factor": 0.55
+ },
+ "lift": {
+  "load_s": 2.0,
+  "unload_s": 2.0,
+  "manual_trips_max": 3
+ },
+ "sales": {
+  "manual_trips_max": 3
+ },
+ "power": {
+  "grid_kw": 30.0
+ },
+ "condition": {
+  "repair_threshold": 0.8,
+  "min_factor": 0.4,
+  "repaired_at": 0.999,
+  "manual_repair": 0.25
+ },
+ "discovery": {
+  "rare_rarities": [
+   "rare",
+   "very_rare",
+   "exotic"
+  ],
+  "respawn_s": 6.0
+ },
+ "research": {
+  "base_rate": 0.0
+ },
+ "income": {
+  "prestige_mult_per_lp": 0.05
+ },
+ "numbers": {
+  "suffixes": [
+   "",
+   "K",
+   "M",
+   "B",
+   "T",
+   "Qa",
+   "Qi",
+   "Sx",
+   "Sp",
+   "Oc",
+   "No",
+   "Dc",
+   "Ud",
+   "Dd",
+   "Td"
+  ]
+ },
+ "automation_stages": [
+  "Manual",
+  "Semi-Automated",
+  "Automated",
+  "Industrial"
+ ],
+ "storage": {
+  "min_station": 30.0,
+  "min_silo": 60.0,
+  "min_warehouse": 60.0
+ }
+}

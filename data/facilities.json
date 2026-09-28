@@ -1,0 +1,1080 @@
+{
+ "_comment": "Surface facilities and per-depth equipment. Stat curves: mode 'mult' (default) value(L) = base * (1 + per_level*(L-1)); mode 'add' value(L) = base + step*(L-1); an optional 'growth' compounds on top (base*(1+per_level*(L-1))*growth^(L-1)) for shared throughput stages that must keep up with every depth; mode 'exp' is pure compounding; then times every milestone multiplier reached, plus 'steps' increments reached, clamped to 'max'. Cost curves: cost(L -> L+1) = base * growth^(L-1) (* depth cost_scale for depth equipment). 'visual_tiers' map levels to what the world shows, so upgrades visibly change the site.",
+ "schema": 1,
+ "milestones_default": [
+  [
+   10,
+   2.0
+  ],
+  [
+   25,
+   2.0
+  ],
+  [
+   50,
+   2.0
+  ],
+  [
+   100,
+   2.0
+  ],
+  [
+   150,
+   2.0
+  ],
+  [
+   200,
+   3.0
+  ],
+  [
+   300,
+   3.0
+  ]
+ ],
+ "facilities": [
+  {
+   "id": "headframe",
+   "name": "Headframe Lift",
+   "category": "transport",
+   "asset": "bld_headframe_01",
+   "plot": "headframe",
+   "description": "Winds the cage up and down the main shaft, carrying ore from every depth to the surface.",
+   "prebuilt": true,
+   "build_cost": 0,
+   "requires": {},
+   "max_level": 400,
+   "cost": {
+    "base": 12,
+    "growth": 1.12
+   },
+   "stats": {
+    "capacity": {
+     "base": 8,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    },
+    "speed_mps": {
+     "base": 2.5,
+     "per_level": 0.03,
+     "max": 12.0
+    }
+   },
+   "operator_slots": 1,
+   "operator_required": "automation",
+   "power_kw": 0,
+   "wear_per_s": 4e-05,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Hand winch"
+    },
+    {
+     "level": 10,
+     "tier": 2,
+     "label": "Steam winder"
+    },
+    {
+     "level": 50,
+     "tier": 3,
+     "label": "Electric hoist"
+    },
+    {
+     "level": 150,
+     "tier": 4,
+     "label": "Skip hoist"
+    }
+   ]
+  },
+  {
+   "id": "silo",
+   "name": "Ore Silos",
+   "category": "storage",
+   "asset": "mach_silo_01",
+   "plot": "silos",
+   "description": "Surface ore storage between the lift and the conveyor. Holds a number of seconds of lift output; more levels, longer buffer.",
+   "prebuilt": true,
+   "build_cost": 0,
+   "requires": {},
+   "max_level": 400,
+   "cost": {
+    "base": 20,
+    "growth": 1.13
+   },
+   "stats": {
+    "buffer_s": {
+     "base": 60,
+     "per_level": 0.08,
+     "milestones": [
+      [
+       25,
+       1.5
+      ],
+      [
+       50,
+       1.5
+      ],
+      [
+       100,
+       1.5
+      ],
+      [
+       200,
+       1.5
+      ]
+     ]
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 0,
+   "wear_per_s": 0.0,
+   "repairable": false,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "1 silo"
+    },
+    {
+     "level": 10,
+     "tier": 2,
+     "label": "2 silos"
+    },
+    {
+     "level": 25,
+     "tier": 3,
+     "label": "3 silos"
+    },
+    {
+     "level": 50,
+     "tier": 4,
+     "label": "4 silos"
+    }
+   ]
+  },
+  {
+   "id": "conveyor",
+   "name": "Surface Conveyor",
+   "category": "transport",
+   "asset": "mach_conveyor_01",
+   "plot": "conveyor",
+   "description": "Carries ore from the silos through the processing plant to the warehouse.",
+   "prebuilt": true,
+   "build_cost": 0,
+   "requires": {},
+   "max_level": 400,
+   "cost": {
+    "base": 18,
+    "growth": 1.125
+   },
+   "stats": {
+    "throughput": {
+     "base": 1.5,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 5,
+   "wear_per_s": 0.0,
+   "repairable": false,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Single belt"
+    },
+    {
+     "level": 25,
+     "tier": 2,
+     "label": "Twin belts"
+    },
+    {
+     "level": 100,
+     "tier": 3,
+     "label": "Conveyor network"
+    }
+   ]
+  },
+  {
+   "id": "crusher",
+   "name": "Jaw Crusher",
+   "category": "processing",
+   "asset": "mach_crusher_01",
+   "plot": "crusher",
+   "description": "Breaks raw ore into gravel-sized feed. First step of almost every chain.",
+   "prebuilt": false,
+   "build_cost": 900,
+   "requires": {
+    "tech": "crushing"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 60,
+    "growth": 1.13
+   },
+   "stats": {
+    "throughput": {
+     "base": 1.2,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 1,
+   "operator_required": "speed",
+   "unoperated_speed": 0.35,
+   "power_kw": 25,
+   "wear_per_s": 0.00015,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Jaw crusher"
+    },
+    {
+     "level": 50,
+     "tier": 2,
+     "label": "Twin crushers"
+    }
+   ]
+  },
+  {
+   "id": "washer",
+   "name": "Trommel Washer",
+   "category": "processing",
+   "asset": "mach_washer_01",
+   "plot": "washer",
+   "description": "Rotating drum scrubs clay and dirt from crushed ore.",
+   "prebuilt": false,
+   "build_cost": 30000,
+   "requires": {
+    "tech": "washing"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 2500,
+    "growth": 1.13
+   },
+   "stats": {
+    "throughput": {
+     "base": 1.4,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 1,
+   "operator_required": "speed",
+   "unoperated_speed": 0.35,
+   "power_kw": 35,
+   "wear_per_s": 0.00015,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Trommel"
+    },
+    {
+     "level": 50,
+     "tier": 2,
+     "label": "Twin trommels"
+    }
+   ]
+  },
+  {
+   "id": "sorter",
+   "name": "Vibrating Sorter",
+   "category": "processing",
+   "asset": "mach_sorter_01",
+   "plot": "sorter",
+   "description": "Double-deck screens grade crystals and gems by size and clarity.",
+   "prebuilt": false,
+   "build_cost": 600000,
+   "requires": {
+    "tech": "sorting"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 45000,
+    "growth": 1.13
+   },
+   "stats": {
+    "throughput": {
+     "base": 1.2,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 1,
+   "operator_required": "speed",
+   "unoperated_speed": 0.35,
+   "power_kw": 30,
+   "wear_per_s": 0.00015,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Screen"
+    },
+    {
+     "level": 50,
+     "tier": 2,
+     "label": "Twin screens"
+    }
+   ]
+  },
+  {
+   "id": "smelter",
+   "name": "Smelter",
+   "category": "processing",
+   "asset": "mach_smelter_01",
+   "plot": "smelter",
+   "description": "Tilting crucible furnace that turns concentrate into ingots and bars.",
+   "prebuilt": false,
+   "build_cost": 900000,
+   "requires": {
+    "tech": "smelting"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 60000,
+    "growth": 1.13
+   },
+   "stats": {
+    "throughput": {
+     "base": 1.0,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 1,
+   "operator_required": "speed",
+   "unoperated_speed": 0.3,
+   "power_kw": 80,
+   "wear_per_s": 0.0002,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Crucible"
+    },
+    {
+     "level": 50,
+     "tier": 2,
+     "label": "Twin crucibles"
+    }
+   ]
+  },
+  {
+   "id": "refinery",
+   "name": "Refinery",
+   "category": "processing",
+   "asset": "mach_processor_01",
+   "plot": "refinery",
+   "description": "Agitated leach tanks and cutting benches: refined metals, cut gems, stabilised exotics.",
+   "prebuilt": false,
+   "build_cost": 250000000,
+   "requires": {
+    "tech": "refining"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 15000000,
+    "growth": 1.13
+   },
+   "stats": {
+    "throughput": {
+     "base": 0.8,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 1,
+   "operator_required": "speed",
+   "unoperated_speed": 0.3,
+   "power_kw": 120,
+   "wear_per_s": 0.0002,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Leach tank"
+    },
+    {
+     "level": 50,
+     "tier": 2,
+     "label": "Tank farm"
+    }
+   ]
+  },
+  {
+   "id": "generator",
+   "name": "Diesel Generator",
+   "category": "utility",
+   "asset": "mach_generator_01",
+   "plot": "generator",
+   "description": "Powers the plant. Machines slow down when demand exceeds supply.",
+   "prebuilt": false,
+   "build_cost": 20000,
+   "requires": {
+    "tech": "diesel_power"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 1500,
+    "growth": 1.12
+   },
+   "stats": {
+    "power_kw": {
+     "base": 80,
+     "per_level": 0.3,
+     "milestones": "default"
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 0,
+   "wear_per_s": 0.0001,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Genset"
+    },
+    {
+     "level": 25,
+     "tier": 2,
+     "label": "Twin gensets"
+    },
+    {
+     "level": 100,
+     "tier": 3,
+     "label": "Power station"
+    }
+   ]
+  },
+  {
+   "id": "pump",
+   "name": "Dewatering Pumps",
+   "category": "utility",
+   "asset": "mach_pump_01",
+   "plot": "pump",
+   "description": "Keeps the deep galleries dry. Capacity must cover the inflow of every flooded depth.",
+   "prebuilt": false,
+   "build_cost": 100000,
+   "requires": {
+    "tech": "dewatering_pumps"
+   },
+   "max_level": 400,
+   "cost": {
+    "base": 8000,
+    "growth": 1.13
+   },
+   "stats": {
+    "capacity": {
+     "base": 1.2,
+     "per_level": 0.08,
+     "milestones": [
+      [
+       25,
+       1.5
+      ],
+      [
+       50,
+       1.5
+      ],
+      [
+       100,
+       1.5
+      ],
+      [
+       200,
+       1.5
+      ]
+     ]
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 20,
+   "wear_per_s": 0.0001,
+   "repairable": true,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Triplex pump"
+    },
+    {
+     "level": 25,
+     "tier": 2,
+     "label": "Twin pumps"
+    }
+   ]
+  },
+  {
+   "id": "warehouse",
+   "name": "Warehouse",
+   "category": "storage",
+   "asset": "bld_warehouse_01",
+   "plot": "warehouse",
+   "description": "Finished goods wait here for the trucks. Holds a number of seconds of plant output; more levels, longer buffer.",
+   "prebuilt": true,
+   "build_cost": 0,
+   "requires": {},
+   "max_level": 400,
+   "cost": {
+    "base": 25,
+    "growth": 1.13
+   },
+   "stats": {
+    "buffer_s": {
+     "base": 90,
+     "per_level": 0.08,
+     "milestones": [
+      [
+       25,
+       1.5
+      ],
+      [
+       50,
+       1.5
+      ],
+      [
+       100,
+       1.5
+      ],
+      [
+       200,
+       1.5
+      ]
+     ]
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 0,
+   "wear_per_s": 0.0,
+   "repairable": false,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Warehouse"
+    },
+    {
+     "level": 10,
+     "tier": 2,
+     "label": "Pallet yard"
+    },
+    {
+     "level": 50,
+     "tier": 3,
+     "label": "Container yard"
+    }
+   ]
+  },
+  {
+   "id": "depot",
+   "name": "Truck Depot",
+   "category": "sales",
+   "asset": "veh_mining_truck_01",
+   "plot": "depot",
+   "description": "Trucks haul finished goods to the railhead market.",
+   "prebuilt": true,
+   "build_cost": 0,
+   "requires": {},
+   "max_level": 400,
+   "cost": {
+    "base": 20,
+    "growth": 1.125
+   },
+   "stats": {
+    "truck_capacity": {
+     "base": 10,
+     "per_level": 0.3,
+     "growth": 1.03,
+     "milestones": "default"
+    },
+    "trucks": {
+     "base": 1,
+     "per_level": 0.0,
+     "steps": [
+      [
+       10,
+       1
+      ],
+      [
+       25,
+       1
+      ],
+      [
+       50,
+       1
+      ],
+      [
+       100,
+       1
+      ],
+      [
+       150,
+       1
+      ],
+      [
+       200,
+       1
+      ],
+      [
+       300,
+       1
+      ]
+     ],
+     "max": 8
+    },
+    "trip_s": {
+     "base": 16.0,
+     "per_level": 0.0
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 0,
+   "wear_per_s": 0.0,
+   "repairable": false,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Pickup truck"
+    },
+    {
+     "level": 10,
+     "tier": 2,
+     "label": "Haul trucks"
+    }
+   ]
+  },
+  {
+   "id": "office",
+   "name": "Site Office",
+   "category": "management",
+   "asset": "bld_office_01",
+   "plot": "office",
+   "description": "Headquarters. More levels house more workers and speed up research.",
+   "prebuilt": true,
+   "build_cost": 0,
+   "requires": {},
+   "max_level": 200,
+   "cost": {
+    "base": 150,
+    "growth": 1.18
+   },
+   "stats": {
+    "worker_capacity": {
+     "base": 4,
+     "per_level": 0.0,
+     "steps": [
+      [
+       2,
+       2
+      ],
+      [
+       3,
+       2
+      ],
+      [
+       4,
+       2
+      ],
+      [
+       5,
+       2
+      ],
+      [
+       6,
+       2
+      ],
+      [
+       8,
+       3
+      ],
+      [
+       10,
+       3
+      ],
+      [
+       12,
+       3
+      ],
+      [
+       15,
+       4
+      ],
+      [
+       20,
+       4
+      ],
+      [
+       25,
+       5
+      ],
+      [
+       30,
+       5
+      ],
+      [
+       40,
+       6
+      ],
+      [
+       50,
+       6
+      ],
+      [
+       60,
+       8
+      ],
+      [
+       75,
+       8
+      ],
+      [
+       100,
+       10
+      ]
+     ],
+     "max": 90
+    },
+    "research": {
+     "base": 0.08,
+     "per_level": 0.05,
+     "milestones": "default"
+    },
+    "engineer_slots": {
+     "base": 1,
+     "per_level": 0.0,
+     "steps": [
+      [
+       5,
+       1
+      ],
+      [
+       10,
+       1
+      ],
+      [
+       20,
+       1
+      ],
+      [
+       40,
+       1
+      ],
+      [
+       80,
+       1
+      ]
+     ],
+     "max": 6
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 0,
+   "wear_per_s": 0.0,
+   "repairable": false,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Site office"
+    },
+    {
+     "level": 20,
+     "tier": 2,
+     "label": "Headquarters"
+    }
+   ]
+  },
+  {
+   "id": "workshop",
+   "name": "Workshop",
+   "category": "maintenance",
+   "asset": "bld_workshop_01",
+   "plot": "workshop",
+   "description": "Mechanics repair worn machines faster here.",
+   "prebuilt": false,
+   "build_cost": 12000,
+   "requires": {
+    "tech": "workshop_tools"
+   },
+   "max_level": 200,
+   "cost": {
+    "base": 800,
+    "growth": 1.14
+   },
+   "stats": {
+    "repair_mult": {
+     "base": 1.0,
+     "per_level": 0.05,
+     "milestones": [
+      [
+       25,
+       1.5
+      ],
+      [
+       50,
+       1.5
+      ],
+      [
+       100,
+       1.5
+      ]
+     ]
+    },
+    "mechanic_slots": {
+     "base": 1,
+     "per_level": 0.0,
+     "steps": [
+      [
+       5,
+       1
+      ],
+      [
+       15,
+       1
+      ],
+      [
+       30,
+       1
+      ],
+      [
+       60,
+       1
+      ]
+     ],
+     "max": 5
+    }
+   },
+   "operator_slots": 0,
+   "power_kw": 10,
+   "wear_per_s": 0.0,
+   "repairable": false,
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Workshop"
+    }
+   ]
+  }
+ ],
+ "depth_equipment": {
+  "mining": {
+   "name": "Mining Operations",
+   "description": "Better techniques and more work faces per depth.",
+   "max_level": 400,
+   "cost": {
+    "base": 6,
+    "growth": 1.14
+   },
+   "stats": {
+    "miner_rate": {
+     "base": 0.5,
+     "per_level": 0.15,
+     "milestones": "default"
+    },
+    "miner_slots": {
+     "base": 2,
+     "per_level": 0.0,
+     "steps": [
+      [
+       5,
+       1
+      ],
+      [
+       10,
+       1
+      ],
+      [
+       20,
+       1
+      ],
+      [
+       30,
+       1
+      ],
+      [
+       45,
+       1
+      ],
+      [
+       60,
+       1
+      ],
+      [
+       80,
+       1
+      ],
+      [
+       100,
+       1
+      ]
+     ],
+     "max": 10
+    }
+   }
+  },
+  "haulage": {
+   "name": "Haulage",
+   "description": "Carts, rails and hauler posts move ore from the face to the shaft station. Capacity is measured in miner-equivalents of the depth's current mining rate.",
+   "max_level": 400,
+   "cost": {
+    "base": 10,
+    "growth": 1.14
+   },
+   "requires_tech_above_level": {
+    "1": "rail_carts"
+   },
+   "stats": {
+    "cart_rate": {
+     "mode": "add",
+     "base": 0.0,
+     "step": 0.3
+    },
+    "hauler_slots": {
+     "base": 1,
+     "per_level": 0.0,
+     "steps": [
+      [
+       10,
+       1
+      ],
+      [
+       30,
+       1
+      ],
+      [
+       60,
+       1
+      ]
+     ],
+     "max": 4
+    }
+   },
+   "visual_tiers": [
+    {
+     "level": 1,
+     "tier": 1,
+     "label": "Wheelbarrows"
+    },
+    {
+     "level": 2,
+     "tier": 2,
+     "label": "Mine cart"
+    },
+    {
+     "level": 25,
+     "tier": 3,
+     "label": "Cart train"
+    },
+    {
+     "level": 75,
+     "tier": 4,
+     "label": "Gallery conveyor"
+    }
+   ]
+  },
+  "station": {
+   "name": "Shaft Station",
+   "description": "Ore bin at the shaft landing. Holds a number of seconds of this depth's full output; the lift loads from here.",
+   "max_level": 400,
+   "cost": {
+    "base": 8,
+    "growth": 1.13
+   },
+   "stats": {
+    "buffer_s": {
+     "base": 60,
+     "per_level": 0.08,
+     "milestones": [
+      [
+       25,
+       1.5
+      ],
+      [
+       50,
+       1.5
+      ],
+      [
+       100,
+       1.5
+      ],
+      [
+       200,
+       1.5
+      ]
+     ]
+    }
+   }
+  },
+  "tools": {
+   "name": "Tooling",
+   "description": "From hand picks to hydraulic excavators.",
+   "tiers": [
+    {
+     "tier": 1,
+     "id": "pickaxe",
+     "name": "Hand Picks",
+     "mult": 1.0,
+     "cost": 0,
+     "requires_tech": "",
+     "tool_asset": "tool_pickaxe_01",
+     "clip": "Mine",
+     "machine_asset": ""
+    },
+    {
+     "tier": 2,
+     "id": "jackhammer",
+     "name": "Pneumatic Jackhammers",
+     "mult": 2.5,
+     "cost": 400,
+     "requires_tech": "pneumatic_drills",
+     "tool_asset": "tool_jackhammer_01",
+     "clip": "Drill",
+     "machine_asset": ""
+    },
+    {
+     "tier": 3,
+     "id": "drill_rig",
+     "name": "Rotary Drill Rig",
+     "mult": 6.0,
+     "cost": 25000,
+     "requires_tech": "drill_rigs",
+     "tool_asset": "tool_jackhammer_01",
+     "clip": "Drill",
+     "machine_asset": "mach_drill_01"
+    },
+    {
+     "tier": 4,
+     "id": "excavator",
+     "name": "Hydraulic Excavator",
+     "mult": 14.0,
+     "cost": 2500000,
+     "requires_tech": "heavy_excavation",
+     "tool_asset": "tool_jackhammer_01",
+     "clip": "Drill",
+     "machine_asset": "veh_excavator_01"
+    }
+   ]
+  }
+ }
+}

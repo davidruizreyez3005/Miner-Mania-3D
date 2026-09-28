@@ -37,3 +37,7 @@ node_modules/
 .venv/
 /tools_cache/
 .DS_Store
+
+# ---- Game build outputs ---------------------------------------------------------
+/build/
+*.uid.tmp

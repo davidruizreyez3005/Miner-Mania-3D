@@ -1,0 +1,223 @@
+{
+ "_comment": "Prestige ('Sell the Claim'). Legacy Points LP = floor(scale * (run_earned / divisor) ^ exponent) (3 LP at $1B, ~47 at $1T) - requires run_earned >= min_earned. Every LP ever earned adds income_per_lp to the permanent income multiplier (spending never reduces it). Upgrades cost LP: cost(L) = base * growth^L. Prestige resets money, workers, levels, depths, facilities, techs (unless kept) and quests of the current claim; keeps LP, legacy upgrades, achievements, discoveries codex, cosmetics, lifetime stats and settings.",
+ "schema": 1,
+ "formula": {
+  "min_earned": 1000000000,
+  "divisor": 1000000000,
+  "exponent": 0.4,
+  "scale": 3.0,
+  "income_per_lp": 0.05
+ },
+ "upgrades": [
+  {
+   "id": "seed_capital",
+   "name": "Seed Capital",
+   "description": "Start each claim with more cash.",
+   "max_level": 10,
+   "cost": {
+    "base": 2,
+    "growth": 1.8
+   },
+   "effects": [
+    {
+     "type": "start_money",
+     "per_level": [
+      500,
+      5000,
+      50000,
+      500000,
+      5000000,
+      50000000,
+      500000000,
+      5000000000,
+      50000000000,
+      500000000000
+     ]
+    }
+   ]
+  },
+  {
+   "id": "veteran_crews",
+   "name": "Veteran Crews",
+   "description": "+10% worker efficiency per level.",
+   "max_level": 20,
+   "cost": {
+    "base": 3,
+    "growth": 1.5
+   },
+   "effects": [
+    {
+     "type": "mult_per_level",
+     "stat": "worker_efficiency",
+     "value": 0.1
+    }
+   ]
+  },
+  {
+   "id": "market_contacts",
+   "name": "Market Contacts",
+   "description": "+10% sale value per level.",
+   "max_level": 25,
+   "cost": {
+    "base": 3,
+    "growth": 1.5
+   },
+   "effects": [
+    {
+     "type": "mult_per_level",
+     "stat": "sale_value",
+     "value": 0.1
+    }
+   ]
+  },
+  {
+   "id": "efficient_logistics",
+   "name": "Efficient Logistics",
+   "description": "+15% lift, haulage and conveyor throughput per level.",
+   "max_level": 20,
+   "cost": {
+    "base": 3,
+    "growth": 1.5
+   },
+   "effects": [
+    {
+     "type": "mult_per_level",
+     "stat": "lift_capacity",
+     "value": 0.15
+    },
+    {
+     "type": "mult_per_level",
+     "stat": "haul_rate",
+     "value": 0.15
+    },
+    {
+     "type": "mult_per_level",
+     "stat": "conveyor_rate",
+     "value": 0.15
+    }
+   ]
+  },
+  {
+   "id": "geological_memory",
+   "name": "Geological Memory",
+   "description": "+25% rare vein chance per level.",
+   "max_level": 10,
+   "cost": {
+    "base": 4,
+    "growth": 1.6
+   },
+   "effects": [
+    {
+     "type": "mult_per_level",
+     "stat": "discovery_chance",
+     "value": 0.25
+    }
+   ]
+  },
+  {
+   "id": "research_archive",
+   "name": "Research Archive",
+   "description": "+25% research speed per level; at level 5 the tier-1 technologies are kept.",
+   "max_level": 10,
+   "cost": {
+    "base": 3,
+    "growth": 1.6
+   },
+   "effects": [
+    {
+     "type": "mult_per_level",
+     "stat": "research_rate",
+     "value": 0.25
+    },
+    {
+     "type": "keep_techs_tier",
+     "at_level": 5,
+     "tier": 1
+    }
+   ]
+  },
+  {
+   "id": "head_start",
+   "name": "Head Start",
+   "description": "Start each claim with more depths already dug.",
+   "max_level": 3,
+   "cost": {
+    "base": 10,
+    "growth": 3.0
+   },
+   "effects": [
+    {
+     "type": "start_depths",
+     "per_level": [
+      2,
+      3,
+      4
+     ]
+    }
+   ]
+  },
+  {
+   "id": "automation_blueprints",
+   "name": "Automation Blueprints",
+   "description": "Start with a lift operator and a sales manager already hired.",
+   "max_level": 1,
+   "cost": {
+    "base": 8,
+    "growth": 1.0
+   },
+   "effects": [
+    {
+     "type": "start_workers",
+     "workers": [
+      {
+       "role": "operator",
+       "post": "headframe"
+      },
+      {
+       "role": "supervisor",
+       "post": "office"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "offline_mastery",
+   "name": "Offline Mastery",
+   "description": "+2 h offline cap and +10% offline efficiency per level.",
+   "max_level": 5,
+   "cost": {
+    "base": 4,
+    "growth": 1.8
+   },
+   "effects": [
+    {
+     "type": "add_per_level",
+     "stat": "offline_cap_h",
+     "value": 2
+    },
+    {
+     "type": "add_per_level",
+     "stat": "offline_efficiency",
+     "value": 0.1
+    }
+   ]
+  },
+  {
+   "id": "deep_charter",
+   "name": "Deep Core Charter",
+   "description": "Licence to dig the Anomaly Core (Depth 8) and refine Aether.",
+   "max_level": 1,
+   "cost": {
+    "base": 25,
+    "growth": 1.0
+   },
+   "effects": [
+    {
+     "type": "flag",
+     "flag": "deep_charter"
+    }
+   ]
+  }
+ ]
+}

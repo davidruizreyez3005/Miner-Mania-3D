@@ -1,0 +1,26 @@
+{
+  "_comment": "Cosmetics change looks only. Foreman outfits swap the player character's worker model (every variant shares the skeleton and clips); lamp themes recolour the headframe and gallery lamps.",
+  "schema": 1,
+  "cosmetics": [
+    {"id": "outfit_miner_01", "kind": "foreman_outfit", "name": "Old Hand", "asset": "chr_worker_miner_01", "default": true},
+    {"id": "outfit_miner_02", "kind": "foreman_outfit", "name": "Drill Sergeant", "asset": "chr_worker_miner_02"},
+    {"id": "outfit_hauler_01", "kind": "foreman_outfit", "name": "Packhorse", "asset": "chr_worker_hauler_01"},
+    {"id": "outfit_hauler_02", "kind": "foreman_outfit", "name": "Shovel Queen", "asset": "chr_worker_hauler_02"},
+    {"id": "outfit_operator_01", "kind": "foreman_outfit", "name": "Machine Whisperer", "asset": "chr_worker_operator_01"},
+    {"id": "outfit_operator_02", "kind": "foreman_outfit", "name": "Radio Ace", "asset": "chr_worker_operator_02"},
+    {"id": "outfit_mechanic_01", "kind": "foreman_outfit", "name": "Wrench", "asset": "chr_worker_mechanic_01"},
+    {"id": "outfit_mechanic_02", "kind": "foreman_outfit", "name": "Hammer Time", "asset": "chr_worker_mechanic_02"},
+    {"id": "outfit_engineer_01", "kind": "foreman_outfit", "name": "Chief Engineer", "asset": "chr_worker_engineer_01"},
+    {"id": "outfit_engineer_02", "kind": "foreman_outfit", "name": "The Planner", "asset": "chr_worker_engineer_02"},
+    {"id": "outfit_geologist_01", "kind": "foreman_outfit", "name": "Rock Hound", "asset": "chr_worker_geologist_01"},
+    {"id": "outfit_geologist_02", "kind": "foreman_outfit", "name": "Professor", "asset": "chr_worker_geologist_02"},
+    {"id": "outfit_supervisor_01", "kind": "foreman_outfit", "name": "The Boss", "asset": "chr_worker_supervisor_01"},
+    {"id": "outfit_supervisor_02", "kind": "foreman_outfit", "name": "Director", "asset": "chr_worker_supervisor_02"},
+    {"id": "lamp_warm", "kind": "lamp_theme", "name": "Tungsten", "color": "", "default": true},
+    {"id": "lamp_ice", "kind": "lamp_theme", "name": "Ice", "color": "#BFE8FF"},
+    {"id": "lamp_violet", "kind": "lamp_theme", "name": "Amethyst", "color": "#C9A0FF"},
+    {"id": "lamp_gold", "kind": "lamp_theme", "name": "Gold Rush", "color": "#FFD36A"},
+    {"id": "lamp_ruby", "kind": "lamp_theme", "name": "Ruby", "color": "#FF7A7A"},
+    {"id": "lamp_aether", "kind": "lamp_theme", "name": "Aether", "color": "#FF8CF0"}
+  ]
+}

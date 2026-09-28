@@ -1,0 +1,350 @@
+{
+ "_comment": "Mine site layout in Godot metres (X right, Y up, Z toward the camera; the cutaway face is the plane z = 0). Surface plots place facilities; 'work' / 'repair' are where workers stand relative to the plot origin. Galleries repeat at every depth: floor y = first_floor_y - spacing*(d-1). Positions here drive both the world builder and the simulation's travel times.",
+ "schema": 1,
+ "surface_y": 0.0,
+ "bounds": {
+  "x": [
+   -46.0,
+   50.0
+  ],
+  "z": [
+   -62.0,
+   0.0
+  ]
+ },
+ "cut_face_z": 0.0,
+ "grid_cell": [
+  6.0,
+  12.0
+ ],
+ "shaft": {
+  "x": -16.0,
+  "z": -4.0,
+  "width": 6.0,
+  "depth": 7.0,
+  "ride_mps": 5.0,
+  "cells_x": [
+   -19.0,
+   -13.0
+  ]
+ },
+ "gallery": {
+  "x_min": -13.0,
+  "x_max": 23.0,
+  "z_back": -9.0,
+  "height": 6.5,
+  "landing": [
+   -12.0,
+   -4.0
+  ],
+  "station": [
+   -9.5,
+   -5.5
+  ],
+  "station_work": [
+   -9.5,
+   -3.6
+  ],
+  "rest": [
+   -5.5,
+   -7.2
+  ],
+  "face": [
+   9.0,
+   -3.2
+  ],
+  "rail_z": -1.8,
+  "rail_x": [
+   -11.0,
+   21.5
+  ],
+  "walk_z": -3.2,
+  "node_work_offset_z": 1.7,
+  "node_slots": [
+   [
+    1.5,
+    -6.4
+   ],
+   [
+    5.2,
+    -7.0
+   ],
+   [
+    8.9,
+    -6.2
+   ],
+   [
+    12.6,
+    -7.0
+   ],
+   [
+    16.3,
+    -6.3
+   ],
+   [
+    20.0,
+    -6.9
+   ]
+  ]
+ },
+ "surface": {
+  "landing": [
+   -12.4,
+   -4.0
+  ],
+  "gate": [
+   44.0,
+   -20.0
+  ],
+  "rest": [
+   -9.0,
+   -28.5
+  ],
+  "plant": [
+   14.0,
+   -11.0
+  ],
+  "road": [
+   [
+    26.0,
+    -20.0
+   ],
+   [
+    36.0,
+    -20.0
+   ],
+   [
+    50.0,
+    -20.0
+   ],
+   [
+    70.0,
+    -20.0
+   ]
+  ],
+  "plots": {
+   "headframe": {
+    "pos": [
+     -16.0,
+     -4.0
+    ],
+    "yaw": 0.0,
+    "work": [
+     3.4,
+     -9.0
+    ],
+    "repair": [
+     3.2,
+     -3.0
+    ]
+   },
+   "silos": {
+    "pos": [
+     -8.5,
+     -6.0
+    ],
+    "yaw": 0.0,
+    "work": [
+     2.2,
+     2.6
+    ],
+    "repair": [
+     2.2,
+     2.6
+    ],
+    "spacing": [
+     3.8,
+     0.0
+    ],
+    "count_by_tier": [
+     1,
+     2,
+     3,
+     4
+    ]
+   },
+   "conveyor": {
+    "pos": [
+     -1.0,
+     -8.0
+    ],
+    "yaw": 90.0,
+    "work": [
+     0.0,
+     1.6
+    ],
+    "repair": [
+     0.0,
+     1.6
+    ],
+    "segment": 6.77,
+    "segments": 5
+   },
+   "crusher": {
+    "pos": [
+     3.0,
+     -13.5
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     2.2
+    ],
+    "repair": [
+     2.4,
+     0.0
+    ]
+   },
+   "washer": {
+    "pos": [
+     10.0,
+     -13.5
+    ],
+    "yaw": 90.0,
+    "work": [
+     0.0,
+     2.2
+    ],
+    "repair": [
+     0.0,
+     -2.2
+    ]
+   },
+   "sorter": {
+    "pos": [
+     17.0,
+     -13.5
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     2.6
+    ],
+    "repair": [
+     2.2,
+     0.0
+    ]
+   },
+   "smelter": {
+    "pos": [
+     23.5,
+     -13.5
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     2.9
+    ],
+    "repair": [
+     2.3,
+     0.0
+    ]
+   },
+   "refinery": {
+    "pos": [
+     30.5,
+     -13.5
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     2.8
+    ],
+    "repair": [
+     2.9,
+     0.0
+    ]
+   },
+   "generator": {
+    "pos": [
+     -8.0,
+     -17.5
+    ],
+    "yaw": 90.0,
+    "work": [
+     0.0,
+     1.6
+    ],
+    "repair": [
+     0.0,
+     1.6
+    ]
+   },
+   "pump": {
+    "pos": [
+     -2.5,
+     -17.5
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     1.9
+    ],
+    "repair": [
+     1.4,
+     0.0
+    ]
+   },
+   "warehouse": {
+    "pos": [
+     14.0,
+     -30.0
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     9.3
+    ],
+    "repair": [
+     0.0,
+     9.3
+    ]
+   },
+   "depot": {
+    "pos": [
+     30.0,
+     -24.0
+    ],
+    "yaw": 90.0,
+    "work": [
+     -3.0,
+     2.5
+    ],
+    "repair": [
+     -3.0,
+     2.5
+    ]
+   },
+   "office": {
+    "pos": [
+     -3.0,
+     -27.5
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     2.6
+    ],
+    "repair": [
+     0.0,
+     2.6
+    ]
+   },
+   "workshop": {
+    "pos": [
+     -27.0,
+     -13.0
+    ],
+    "yaw": 0.0,
+    "work": [
+     0.0,
+     2.2
+    ],
+    "repair": [
+     0.0,
+     2.2
+    ]
+   }
+  }
+ }
+}

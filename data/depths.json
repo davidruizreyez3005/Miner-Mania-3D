@@ -1,0 +1,377 @@
+{
+ "_comment": "Underground levels. Each depth is a gallery reached through the main shaft. 'cost_scale' multiplies every depth-local cost (mining, haulage, station, tooling); ore value per unit of mining work grows ~x8 per depth while depth costs grow ~x9, so every new depth is a real jump. 'resources' are vein weights; hazards must be mitigated or they throttle extraction. 'environment' drives lighting/atmosphere; 'set_dressing' names module kits the world builder places.",
+ "schema": 1,
+ "level_spacing_m": 12.0,
+ "first_floor_y_m": -12.0,
+ "depths": [
+  {
+   "index": 1,
+   "id": "topsoil_drift",
+   "name": "Topsoil Drift",
+   "biome": "earth",
+   "story": "The old company's first drift. Rotten timbers and a rusty lamp still hang where they left them.",
+   "unlock_cost": 0,
+   "cost_scale": 1.0,
+   "node_slots": 3,
+   "node_hp": 60,
+   "resources": {
+    "stone": 70,
+    "coal": 20,
+    "copper": 10
+   },
+   "hazards": [],
+   "environment": {
+    "ambient": "#6B5A48",
+    "ambient_energy": 0.55,
+    "fog": "#3A2E24",
+    "fog_density": 0.012,
+    "lamp": "#FFC47A",
+    "lamp_energy": 2.2,
+    "rock_tint": "#8A7058",
+    "strata_tint": "#6E5842",
+    "wall_material": "soil",
+    "crystal_glow": ""
+   },
+   "set_dressing": [
+    "support_wood",
+    "lamp_hanging",
+    "barrels",
+    "old_tools",
+    "rubble"
+   ]
+  },
+  {
+   "index": 2,
+   "id": "coal_seam",
+   "name": "Coal Seam",
+   "biome": "coal",
+   "story": "Black seams run through the walls. Soot-stained warning signs mark the old gas pockets.",
+   "unlock_cost": 2500,
+   "cost_scale": 12.0,
+   "node_slots": 4,
+   "node_hp": 90,
+   "resources": {
+    "iron": 45,
+    "copper": 25,
+    "coal": 20,
+    "stone": 10
+   },
+   "hazards": [],
+   "environment": {
+    "ambient": "#4E4A48",
+    "ambient_energy": 0.45,
+    "fog": "#1E1C1C",
+    "fog_density": 0.016,
+    "lamp": "#FFB866",
+    "lamp_energy": 2.4,
+    "rock_tint": "#4A4644",
+    "strata_tint": "#2A2828",
+    "wall_material": "stone_dark",
+    "crystal_glow": ""
+   },
+   "set_dressing": [
+    "support_wood",
+    "lamp_hanging",
+    "signs",
+    "cable_tray",
+    "rubble",
+    "coal_pile"
+   ]
+  },
+  {
+   "index": 3,
+   "id": "deep_caverns",
+   "name": "Deep Caverns",
+   "biome": "cavern",
+   "story": "The drift breaks into natural caverns. Water seeps from every crack; pumps are a must.",
+   "unlock_cost": 300000,
+   "cost_scale": 150.0,
+   "node_slots": 4,
+   "node_hp": 140,
+   "resources": {
+    "iron": 15,
+    "copper": 5,
+    "silver": 30,
+    "quartz": 25,
+    "gold": 25
+   },
+   "hazards": [
+    "water"
+   ],
+   "environment": {
+    "ambient": "#3E5566",
+    "ambient_energy": 0.5,
+    "fog": "#16222B",
+    "fog_density": 0.02,
+    "lamp": "#DDEBFF",
+    "lamp_energy": 2.4,
+    "rock_tint": "#5C6670",
+    "strata_tint": "#3C444C",
+    "wall_material": "stone_gray",
+    "crystal_glow": ""
+   },
+   "set_dressing": [
+    "support_steel",
+    "lamp_hanging",
+    "pipes",
+    "puddles",
+    "stalactites",
+    "pump_station"
+   ]
+  },
+  {
+   "index": 4,
+   "id": "rare_formations",
+   "name": "Rare Mineral Formations",
+   "biome": "mineral",
+   "story": "Banded red strata full of rare minerals. The air is thick; ventilation fans roar day and night.",
+   "unlock_cost": 20000000,
+   "cost_scale": 2000.0,
+   "node_slots": 5,
+   "node_hp": 220,
+   "resources": {
+    "silver": 10,
+    "gold": 20,
+    "platinum": 35,
+    "emerald": 25,
+    "quartz": 10
+   },
+   "hazards": [
+    "water",
+    "gas"
+   ],
+   "environment": {
+    "ambient": "#6A4A44",
+    "ambient_energy": 0.5,
+    "fog": "#2A1714",
+    "fog_density": 0.02,
+    "lamp": "#FFD9A8",
+    "lamp_energy": 2.6,
+    "rock_tint": "#8A4E3E",
+    "strata_tint": "#5E2E24",
+    "wall_material": "stone_red",
+    "crystal_glow": ""
+   },
+   "set_dressing": [
+    "support_steel",
+    "lamp_hanging",
+    "pipes",
+    "vent_ducts",
+    "signs",
+    "containers"
+   ]
+  },
+  {
+   "index": 5,
+   "id": "crystal_caverns",
+   "name": "Crystal Caverns",
+   "biome": "crystal",
+   "story": "Walls of living crystal light the way. Beautiful - and brittle. Every blast must be bolted.",
+   "unlock_cost": 1500000000,
+   "cost_scale": 30000.0,
+   "node_slots": 5,
+   "node_hp": 340,
+   "resources": {
+    "amethyst": 30,
+    "emerald": 10,
+    "ruby": 25,
+    "sapphire": 25,
+    "gold": 10
+   },
+   "hazards": [
+    "instability"
+   ],
+   "environment": {
+    "ambient": "#4A3E70",
+    "ambient_energy": 0.65,
+    "fog": "#150F2A",
+    "fog_density": 0.018,
+    "lamp": "#B8A6FF",
+    "lamp_energy": 2.0,
+    "rock_tint": "#4E4A66",
+    "strata_tint": "#2E2A48",
+    "wall_material": "stone_dark",
+    "crystal_glow": "#B070FF"
+   },
+   "set_dressing": [
+    "support_steel",
+    "crystal_clusters",
+    "lamp_hanging",
+    "scaffold",
+    "signs"
+   ]
+  },
+  {
+   "index": 6,
+   "id": "industrial_deep",
+   "name": "Industrial Deep Works",
+   "biome": "industrial",
+   "story": "Concrete-lined halls, blast doors and heat exchangers. Mining at industrial scale.",
+   "unlock_cost": 60000000000,
+   "cost_scale": 450000.0,
+   "node_slots": 6,
+   "node_hp": 520,
+   "resources": {
+    "platinum": 10,
+    "diamond": 30,
+    "uranium": 35,
+    "ruby": 10,
+    "sapphire": 15
+   },
+   "hazards": [
+    "water",
+    "heat"
+   ],
+   "environment": {
+    "ambient": "#5A5A5E",
+    "ambient_energy": 0.6,
+    "fog": "#221A14",
+    "fog_density": 0.015,
+    "lamp": "#FFE9C2",
+    "lamp_energy": 3.0,
+    "rock_tint": "#6A6660",
+    "strata_tint": "#3A3632",
+    "wall_material": "concrete",
+    "crystal_glow": ""
+   },
+   "set_dressing": [
+    "support_steel",
+    "catwalk",
+    "pipes",
+    "cable_tray",
+    "containers",
+    "lamp_post",
+    "barriers"
+   ]
+  },
+  {
+   "index": 7,
+   "id": "the_abyss",
+   "name": "The Abyss",
+   "biome": "abyss",
+   "story": "Beyond any survey. Strange cyan veins pulse in the dark, and the rock is warm to the touch.",
+   "unlock_cost": 6000000000000,
+   "cost_scale": 7000000.0,
+   "node_slots": 6,
+   "node_hp": 800,
+   "resources": {
+    "diamond": 20,
+    "uranium": 15,
+    "voidstone": 55,
+    "platinum": 10
+   },
+   "hazards": [
+    "water",
+    "heat",
+    "radiation"
+   ],
+   "environment": {
+    "ambient": "#1E4A50",
+    "ambient_energy": 0.6,
+    "fog": "#061416",
+    "fog_density": 0.024,
+    "lamp": "#9FF7EE",
+    "lamp_energy": 2.2,
+    "rock_tint": "#2E3A3C",
+    "strata_tint": "#152022",
+    "wall_material": "stone_dark",
+    "crystal_glow": "#29E0D2"
+   },
+   "set_dressing": [
+    "support_steel",
+    "crystal_clusters",
+    "pipes",
+    "signs",
+    "lamp_hanging",
+    "barriers"
+   ]
+  },
+  {
+   "index": 8,
+   "id": "anomaly_core",
+   "name": "Anomaly Core",
+   "biome": "anomaly",
+   "story": "The mountain's heart. Gravity feels wrong here, and the Aether sings.",
+   "unlock_cost": 1000000000000000,
+   "cost_scale": 110000000.0,
+   "node_slots": 6,
+   "node_hp": 1200,
+   "resources": {
+    "voidstone": 50,
+    "diamond": 25,
+    "aether": 25
+   },
+   "hazards": [
+    "heat",
+    "radiation",
+    "instability"
+   ],
+   "requires_prestige": 1,
+   "environment": {
+    "ambient": "#5A2A5A",
+    "ambient_energy": 0.7,
+    "fog": "#1A0618",
+    "fog_density": 0.022,
+    "lamp": "#FFB0F0",
+    "lamp_energy": 2.2,
+    "rock_tint": "#3A2A3E",
+    "strata_tint": "#1E1022",
+    "wall_material": "stone_dark",
+    "crystal_glow": "#FF4FD8"
+   },
+   "set_dressing": [
+    "support_steel",
+    "crystal_clusters",
+    "catwalk",
+    "pipes",
+    "lamp_hanging",
+    "barriers"
+   ]
+  }
+ ],
+ "hazards": {
+  "water": {
+   "name": "Flooding",
+   "penalty": 0.45,
+   "mitigation": {
+    "facility_capacity": "pump",
+    "inflow_base": 1.0,
+    "inflow_per_depth": 1.0,
+    "from_depth": 3
+   },
+   "description": "Water floods the gallery. Surface pump capacity must cover the inflow of every flooded depth (deeper = more water)."
+  },
+  "gas": {
+   "name": "Firedamp",
+   "penalty": 0.55,
+   "mitigation": {
+    "tech": "ventilation"
+   },
+   "description": "Explosive gas pockets. Research Ventilation Fans."
+  },
+  "instability": {
+   "name": "Rockfalls",
+   "penalty": 0.55,
+   "mitigation": {
+    "tech": "rock_bolting"
+   },
+   "description": "Brittle rock collapses. Research Rock Bolting."
+  },
+  "heat": {
+   "name": "Extreme Heat",
+   "penalty": 0.5,
+   "mitigation": {
+    "tech": "cooling_plant"
+   },
+   "description": "Rock temperatures above 50 C. Research the Cooling Plant."
+  },
+  "radiation": {
+   "name": "Radiation",
+   "penalty": 0.5,
+   "mitigation": {
+    "tech": "radiation_shielding"
+   },
+   "description": "Ionising radiation. Research Radiation Shielding."
+  }
+ }
+}

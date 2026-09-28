@@ -1,0 +1,673 @@
+{
+ "_comment": "Research tree. Cost = research points (from engineers + office) and money. Effects: mult (multiplies a modifier stat), add (adds to an additive stat), unlock (facility:<id> | tool:<tier> | role:<id> | feature:<id>), mitigate (hazard), flag (named rule switch). 'column' and 'tier' place the node in the UI tree.",
+ "schema": 1,
+ "technologies": [
+  {
+   "id": "steel_picks",
+   "name": "Steel Picks",
+   "tier": 1,
+   "column": 0,
+   "rp": 8,
+   "cost": 150,
+   "requires": [],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "mining_rate",
+     "value": 1.25
+    },
+    {
+     "type": "mult",
+     "stat": "manual_yield",
+     "value": 1.5
+    }
+   ],
+   "description": "Forged steel heads bite deeper into the rock."
+  },
+  {
+   "id": "crushing",
+   "name": "Crushing",
+   "tier": 1,
+   "column": 1,
+   "rp": 12,
+   "cost": 400,
+   "requires": [],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:crusher"
+    }
+   ],
+   "description": "Unlocks the Jaw Crusher: aggregate and crushed ore sell for more."
+  },
+  {
+   "id": "bookkeeping",
+   "name": "Bookkeeping",
+   "tier": 1,
+   "column": 2,
+   "rp": 10,
+   "cost": 250,
+   "requires": [],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "sale_value",
+     "value": 1.1
+    }
+   ],
+   "description": "Keep proper ledgers and haggle better at the railhead."
+  },
+  {
+   "id": "rail_carts",
+   "name": "Rail Carts",
+   "tier": 1,
+   "column": 3,
+   "rp": 15,
+   "cost": 350,
+   "requires": [],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "feature:carts"
+    }
+   ],
+   "description": "Lay 600 mm track and run mine carts from the face to the shaft."
+  },
+  {
+   "id": "counterweights",
+   "name": "Counterweights",
+   "tier": 1,
+   "column": 4,
+   "rp": 20,
+   "cost": 600,
+   "requires": [],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "lift_speed",
+     "value": 1.3
+    }
+   ],
+   "description": "A counterweighted cage winds faster with the same winch."
+  },
+  {
+   "id": "pneumatic_drills",
+   "name": "Pneumatic Drills",
+   "tier": 2,
+   "column": 0,
+   "rp": 60,
+   "cost": 4000,
+   "requires": [
+    "steel_picks"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "tool:2"
+    }
+   ],
+   "description": "Compressed-air jackhammers. Unlocks tooling tier 2 at every depth."
+  },
+  {
+   "id": "washing",
+   "name": "Ore Washing",
+   "tier": 2,
+   "column": 1,
+   "rp": 70,
+   "cost": 9000,
+   "requires": [
+    "crushing"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:washer"
+    }
+   ],
+   "description": "Unlocks the Trommel Washer."
+  },
+  {
+   "id": "haul_trucks",
+   "name": "Haul Trucks",
+   "tier": 2,
+   "column": 2,
+   "rp": 55,
+   "cost": 6000,
+   "requires": [
+    "bookkeeping"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "truck_capacity",
+     "value": 1.5
+    }
+   ],
+   "description": "Proper haul trucks replace the old pickup."
+  },
+  {
+   "id": "diesel_power",
+   "name": "Diesel Power",
+   "tier": 2,
+   "column": 3,
+   "rp": 65,
+   "cost": 7000,
+   "requires": [
+    "crushing"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:generator"
+    }
+   ],
+   "description": "Unlocks the Diesel Generator. The grid alone cannot feed a real plant."
+  },
+  {
+   "id": "workshop_tools",
+   "name": "Workshop Tools",
+   "tier": 2,
+   "column": 4,
+   "rp": 45,
+   "cost": 5000,
+   "requires": [
+    "counterweights"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:workshop"
+    },
+    {
+     "type": "unlock",
+     "what": "role:mechanic"
+    },
+    {
+     "type": "mult",
+     "stat": "repair_rate",
+     "value": 1.2
+    }
+   ],
+   "description": "Unlocks the Workshop and Mechanics."
+  },
+  {
+   "id": "field_geology",
+   "name": "Field Geology",
+   "tier": 2,
+   "column": 5,
+   "rp": 80,
+   "cost": 12000,
+   "requires": [
+    "steel_picks"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "role:geologist"
+    },
+    {
+     "type": "mult",
+     "stat": "discovery_chance",
+     "value": 1.3
+    }
+   ],
+   "description": "Unlocks Geologists, who find richer veins."
+  },
+  {
+   "id": "dewatering_pumps",
+   "name": "Dewatering Pumps",
+   "tier": 3,
+   "column": 3,
+   "rp": 160,
+   "cost": 45000,
+   "requires": [
+    "diesel_power"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:pump"
+    }
+   ],
+   "description": "Unlocks Dewatering Pumps. Required to work flooded depths at full speed."
+  },
+  {
+   "id": "sorting",
+   "name": "Screening & Sorting",
+   "tier": 3,
+   "column": 1,
+   "rp": 380,
+   "cost": 220000,
+   "requires": [
+    "washing"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:sorter"
+    }
+   ],
+   "description": "Unlocks the Vibrating Sorter for crystals and gems."
+  },
+  {
+   "id": "smelting",
+   "name": "Smelting",
+   "tier": 3,
+   "column": 2,
+   "rp": 450,
+   "cost": 300000,
+   "requires": [
+    "washing",
+    "diesel_power"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:smelter"
+    }
+   ],
+   "description": "Unlocks the Smelter: ingots and bars."
+  },
+  {
+   "id": "electric_hoist",
+   "name": "Electric Hoist",
+   "tier": 3,
+   "column": 4,
+   "rp": 300,
+   "cost": 150000,
+   "requires": [
+    "counterweights",
+    "diesel_power"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "lift_capacity",
+     "value": 1.5
+    },
+    {
+     "type": "mult",
+     "stat": "lift_speed",
+     "value": 1.3
+    }
+   ],
+   "description": "Electric winder: bigger cage, faster winding."
+  },
+  {
+   "id": "conveyor_networks",
+   "name": "Conveyor Networks",
+   "tier": 3,
+   "column": 5,
+   "rp": 350,
+   "cost": 180000,
+   "requires": [
+    "crushing",
+    "rail_carts"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "conveyor_rate",
+     "value": 1.5
+    },
+    {
+     "type": "mult",
+     "stat": "haul_rate",
+     "value": 1.25
+    }
+   ],
+   "description": "Belts everywhere. Faster surface throughput and gallery haulage."
+  },
+  {
+   "id": "automated_dispatch",
+   "name": "Automated Dispatch",
+   "tier": 3,
+   "column": 6,
+   "rp": 260,
+   "cost": 120000,
+   "requires": [
+    "haul_trucks"
+   ],
+   "effects": [
+    {
+     "type": "flag",
+     "flag": "auto_sales"
+    },
+    {
+     "type": "mult",
+     "stat": "sales_rate",
+     "value": 1.15
+    }
+   ],
+   "description": "Trucks leave automatically as soon as they are loaded - no sales manager needed."
+  },
+  {
+   "id": "payroll_software",
+   "name": "Payroll Software",
+   "tier": 3,
+   "column": 0,
+   "rp": 200,
+   "cost": 90000,
+   "requires": [
+    "bookkeeping"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "hire_cost",
+     "value": 0.8
+    }
+   ],
+   "description": "Hiring costs 20% less."
+  },
+  {
+   "id": "ventilation",
+   "name": "Ventilation Fans",
+   "tier": 4,
+   "column": 3,
+   "rp": 1500,
+   "cost": 4000000,
+   "requires": [
+    "dewatering_pumps"
+   ],
+   "effects": [
+    {
+     "type": "mitigate",
+     "hazard": "gas"
+    }
+   ],
+   "description": "Clears firedamp from the Rare Mineral Formations."
+  },
+  {
+   "id": "drill_rigs",
+   "name": "Drill Rigs",
+   "tier": 4,
+   "column": 0,
+   "rp": 1800,
+   "cost": 6000000,
+   "requires": [
+    "pneumatic_drills",
+    "diesel_power"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "tool:3"
+    }
+   ],
+   "description": "Unlocks tooling tier 3: rotary drill rigs at the face."
+  },
+  {
+   "id": "precision_assay",
+   "name": "Precision Assay",
+   "tier": 4,
+   "column": 1,
+   "rp": 1200,
+   "cost": 8000000,
+   "requires": [
+    "sorting",
+    "field_geology"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "sale_value",
+     "value": 1.2
+    },
+    {
+     "type": "mult",
+     "stat": "discovery_chance",
+     "value": 1.3
+    }
+   ],
+   "description": "Certified assays fetch better prices."
+  },
+  {
+   "id": "hydraulic_winders",
+   "name": "Hydraulic Winders",
+   "tier": 4,
+   "column": 4,
+   "rp": 2000,
+   "cost": 12000000,
+   "requires": [
+    "electric_hoist"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "lift_capacity",
+     "value": 1.6
+    }
+   ],
+   "description": "Skip hoists with hydraulic brakes."
+  },
+  {
+   "id": "overtime_policy",
+   "name": "Shift Rotation",
+   "tier": 4,
+   "column": 5,
+   "rp": 900,
+   "cost": 3000000,
+   "requires": [
+    "payroll_software"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "fatigue",
+     "value": 0.6
+    },
+    {
+     "type": "mult",
+     "stat": "worker_efficiency",
+     "value": 1.1
+    }
+   ],
+   "description": "Better rotas: workers tire 40% slower and work 10% better."
+  },
+  {
+   "id": "refining",
+   "name": "Refining",
+   "tier": 5,
+   "column": 1,
+   "rp": 9000,
+   "cost": 500000000,
+   "requires": [
+    "smelting",
+    "sorting"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "facility:refinery"
+    }
+   ],
+   "description": "Unlocks the Refinery: refined metals and cut gems."
+  },
+  {
+   "id": "rock_bolting",
+   "name": "Rock Bolting",
+   "tier": 5,
+   "column": 3,
+   "rp": 8000,
+   "cost": 400000000,
+   "requires": [
+    "ventilation"
+   ],
+   "effects": [
+    {
+     "type": "mitigate",
+     "hazard": "instability"
+    }
+   ],
+   "description": "Resin bolts hold the brittle crystal caverns together."
+  },
+  {
+   "id": "automated_controls",
+   "name": "Automated Controls",
+   "tier": 5,
+   "column": 5,
+   "rp": 6000,
+   "cost": 250000000,
+   "requires": [
+    "conveyor_networks"
+   ],
+   "effects": [
+    {
+     "type": "flag",
+     "flag": "machines_self_run"
+    },
+    {
+     "type": "mult",
+     "stat": "wear_rate",
+     "value": 0.75
+    }
+   ],
+   "description": "Unattended machines run at 75% speed instead of a third; less wear."
+  },
+  {
+   "id": "remote_operations",
+   "name": "Remote Operations",
+   "tier": 5,
+   "column": 6,
+   "rp": 5000,
+   "cost": 150000000,
+   "requires": [
+    "automated_dispatch"
+   ],
+   "effects": [
+    {
+     "type": "add",
+     "stat": "offline_cap_h",
+     "value": 4
+    },
+    {
+     "type": "add",
+     "stat": "offline_efficiency",
+     "value": 0.2
+    }
+   ],
+   "description": "Run the mine from home: +4 h offline time and +20% offline efficiency."
+  },
+  {
+   "id": "heavy_excavation",
+   "name": "Heavy Excavation",
+   "tier": 6,
+   "column": 0,
+   "rp": 40000,
+   "cost": 15000000000,
+   "requires": [
+    "drill_rigs",
+    "hydraulic_winders"
+   ],
+   "effects": [
+    {
+     "type": "unlock",
+     "what": "tool:4"
+    }
+   ],
+   "description": "Unlocks tooling tier 4: hydraulic excavators underground."
+  },
+  {
+   "id": "cooling_plant",
+   "name": "Cooling Plant",
+   "tier": 6,
+   "column": 3,
+   "rp": 60000,
+   "cost": 12000000000,
+   "requires": [
+    "rock_bolting"
+   ],
+   "effects": [
+    {
+     "type": "mitigate",
+     "hazard": "heat"
+    }
+   ],
+   "description": "Chilled-water plant for the hot deep works."
+  },
+  {
+   "id": "market_futures",
+   "name": "Market Futures",
+   "tier": 6,
+   "column": 1,
+   "rp": 45000,
+   "cost": 20000000000,
+   "requires": [
+    "precision_assay",
+    "refining"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "sale_value",
+     "value": 1.35
+    }
+   ],
+   "description": "Sell forward at the best price of the cycle."
+  },
+  {
+   "id": "radiation_shielding",
+   "name": "Radiation Shielding",
+   "tier": 7,
+   "column": 3,
+   "rp": 300000,
+   "cost": 1500000000000,
+   "requires": [
+    "cooling_plant"
+   ],
+   "effects": [
+    {
+     "type": "mitigate",
+     "hazard": "radiation"
+    }
+   ],
+   "description": "Lead-lined cabs and dosimetry for the Abyss."
+  },
+  {
+   "id": "deep_core_drilling",
+   "name": "Deep Core Drilling",
+   "tier": 7,
+   "column": 0,
+   "rp": 450000,
+   "cost": 2500000000000,
+   "requires": [
+    "heavy_excavation",
+    "cooling_plant"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "mining_rate",
+     "value": 1.5
+    }
+   ],
+   "description": "Core drills that never dull: +50% mining everywhere."
+  },
+  {
+   "id": "quantum_assay",
+   "name": "Quantum Assay",
+   "tier": 8,
+   "column": 1,
+   "rp": 1500000,
+   "cost": 200000000000000,
+   "requires": [
+    "market_futures",
+    "radiation_shielding"
+   ],
+   "effects": [
+    {
+     "type": "mult",
+     "stat": "sale_value",
+     "value": 1.5
+    },
+    {
+     "type": "mult",
+     "stat": "discovery_chance",
+     "value": 2.0
+    }
+   ],
+   "description": "Exotic-matter spectroscopy. The market pays for certainty."
+  }
+ ]
+}
