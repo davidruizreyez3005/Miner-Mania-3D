@@ -9,17 +9,51 @@ from the shipped arm64-v8a APK only in the engine's native library.
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
+import struct
 import sys
 import zipfile
 
 IGNORED = ("lib/", "META-INF/")
+CLASS_CACHE = "assets/.godot/global_script_class_cache.cfg"
+UID_CACHE = "assets/.godot/uid_cache.bin"
 
 
 def entries(path: str) -> dict:
     with zipfile.ZipFile(path) as z:
         return {i.filename: (i.CRC, i.file_size) for i in z.infolist()
                 if not i.filename.startswith(IGNORED) and not i.is_dir()}
+
+
+def uid_entries(data: bytes) -> set:
+    """Godot's uid_cache.bin: u32 count, then (u64 uid, u32 length, path)."""
+    out, off = set(), 4
+    for _ in range(struct.unpack_from("<I", data, 0)[0]):
+        uid, n = struct.unpack_from("<QI", data, off)
+        off += 12
+        out.add((uid, data[off:off + n].decode("utf-8", "replace")))
+        off += n
+    return out
+
+
+def explain(a_path: str, b_path: str, name: str) -> list:
+    """Human-readable detail for a differing editor cache file."""
+    with zipfile.ZipFile(a_path) as za, zipfile.ZipFile(b_path) as zb:
+        da, db = za.read(name), zb.read(name)
+    if name == CLASS_CACHE:
+        diff = difflib.unified_diff(da.decode("utf-8", "replace").splitlines(),
+                                    db.decode("utf-8", "replace").splitlines(), "a", "b", lineterm="", n=1)
+        return list(diff)[:60]
+    if name == UID_CACHE:
+        try:
+            ea, eb = uid_entries(da), uid_entries(db)
+        except (struct.error, IndexError):
+            return ["(unreadable uid cache)"]
+        return [f"- {p} ({u})" for u, p in sorted(ea - eb, key=lambda e: e[1])][:30] + \
+               [f"+ {p} ({u})" for u, p in sorted(eb - ea, key=lambda e: e[1])][:30] + \
+               ([f"same {len(ea)} entries in a different order"] if ea == eb else [])
+    return []
 
 
 def libs(path: str) -> list:
@@ -52,6 +86,11 @@ def main() -> int:
     for label, items in (("only in " + args.a, only_a), ("only in " + args.b, only_b), ("different", changed)):
         for k in items[:20]:
             print(f"  {label}: {k}")
+    for name in (CLASS_CACHE, UID_CACHE):
+        if name in changed:
+            print(f"  {name}:")
+            for line in explain(args.a, args.b, name):
+                print("    " + line)
     print("identical game content" if report["identical_content"] else "CONTENT DIFFERS")
     return 0 if report["identical_content"] else 1
 

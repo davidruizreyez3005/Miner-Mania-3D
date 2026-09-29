@@ -72,11 +72,16 @@ jobs:
             -keypass android -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Android Debug,O=Android,C=US" -noprompt
           python tools/ci/configure_godot_android.py --sdk "$ANDROID_SDK" --java "$java_home" --debug-keystore "$keystore"
 
-      - name: Export the debug APK
+      - name: Export the debug APK and its x86_64 twin for the emulator
         run: |
           mkdir -p build/apk
           "$GODOT" --headless --path . --export-debug "Android" build/apk/MinerMania3D-debug.apk 2>&1 | tee build/apk/export.log
           test -s build/apk/MinerMania3D-debug.apk
+          python tools/apk/add_emulator_preset.py
+          "$GODOT" --headless --path . --export-debug "Android x86_64 (emulator test)" \
+            build/apk/MinerMania3D-x86_64-emulator.apk 2>&1 | tee build/apk/export_x86_64.log
+          git checkout -- export_presets.cfg
+          test -s build/apk/MinerMania3D-x86_64-emulator.apk
 
       - name: Verify the APK
         run: |
@@ -110,13 +115,8 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Export the x86_64 twin for the emulator (same game content)
+      - name: Prove the x86_64 twin carries the same game
         run: |
-          python tools/apk/add_emulator_preset.py
-          "$GODOT" --headless --path . --export-debug "Android x86_64 (emulator test)" \
-            build/apk/MinerMania3D-x86_64-emulator.apk 2>&1 | tee build/apk/export_x86_64.log
-          git checkout -- export_presets.cfg
-          test -s build/apk/MinerMania3D-x86_64-emulator.apk
           python tools/apk/compare_content.py build/apk/MinerMania3D-debug.apk \
             build/apk/MinerMania3D-x86_64-emulator.apk --report build/apk/content_compare.json
 

@@ -39,7 +39,10 @@ node_modules/
 .DS_Store
 
 # ---- Game build outputs ---------------------------------------------------------
-/build/
+# build/ keeps only its .gdignore, which stops Godot from scanning (and giving
+# UIDs to) build outputs such as the APK reports.
+/build/*
+!/build/.gdignore
 *.uid.tmp
 assets/generated/catalog.json
 # Procedural audio and texture outputs (tools/audio/synth.py, tools/textures/texgen.py)
