@@ -65,6 +65,9 @@ func _initialize() -> void:
 	main = (load("res://game/main.tscn") as PackedScene).instantiate()
 	root.add_child(main)
 	await _run()
+	# Tear the game down before quitting (errors on the way out count too).
+	main.queue_free()
+	await _frames(30)
 	var report := {"failures": failures, "errors": cap.errors, "headless_renderer_warnings": cap.warnings, "steps": log_lines}
 	var rp := _arg("--report")
 	if rp != "":
@@ -127,6 +130,17 @@ func _run() -> void:
 		return
 	await _frames(30)
 	await _shot("02_playing")
+	# Back (Android) while the first tutorial tip shows opens the pause menu;
+	# closing it brings the tip back.
+	if _state() != GS.TUTORIAL:
+		failures.append("a new claim should open the tutorial: %s" % GameStateMachine.name_of(_state()))
+	elif not main.ui.back() or _state() != GS.PAUSED:
+		failures.append("Back did not open the pause menu over the tutorial: %s" % GameStateMachine.name_of(_state()))
+	else:
+		main.ui.back()
+		await _frames(10)
+		if _state() != GS.TUTORIAL:
+			failures.append("the tutorial did not come back after the pause menu: %s" % GameStateMachine.name_of(_state()))
 	var sim: Simulation = root.get_node("Session").sim
 	# Play: swing at a vein until ore piles up, wind the lift, sell.
 	main._on_tap("node:1:0", Vector3.ZERO, -1, Vector3.ZERO)
@@ -162,6 +176,22 @@ func _run() -> void:
 		i += 1
 		if _state() != GS.PLAYING and not root.get_node("GameState").has(GS.TUTORIAL):
 			failures.append("state not restored after closing %s: %s" % [p[0], GameStateMachine.name_of(_state())])
+	# Memory: opening and closing every panel again and again must not leave
+	# objects or orphan nodes behind (the first pass warms the caches).
+	var counts: Array = []
+	for cycle in 3:
+		for p in PANELS:
+			var again = ui.open_panel(String(p[0]), p[1])
+			await _frames(3)
+			if again != null:
+				ui.close_panel(again)
+			await _frames(3)
+		await _frames(40)
+		counts.append([int(Performance.get_monitor(Performance.OBJECT_COUNT)),
+			int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))])
+	print("ui_smoke: objects/orphan nodes after each panel cycle: ", counts)
+	if int(counts[2][0]) - int(counts[1][0]) > 60 or int(counts[2][1]) > int(counts[1][1]):
+		failures.append("objects pile up while opening and closing panels: %s" % str(counts))
 	ui.open_panel("offline", {"report": {"away_s": 7300.0, "credited_s": 7200.0, "capped": true, "efficiency": 0.6,
 		"mined": {"stone": 420.0, "coal": 95.0, "copper": 12.0}, "processed_units": 300.0, "sold_units": 480.0, "earned": 18450.0,
 		"discoveries": ["copper"]}})
@@ -182,3 +212,22 @@ func _run() -> void:
 	await _shot("%02d_title_again" % (i + 2))
 	if not root.get_node("SaveService").has_save():
 		failures.append("quitting to the title did not save")
+	# Memory: going back into the mine and out again must not keep the
+	# previous world (views, agents, effects) alive.
+	var at_title: Array = []
+	for trip in 2:
+		main._start("continue")
+		if not await _wait_state(GS.PLAYING, 120.0, "the saved game to load"):
+			return
+		await _frames(60)
+		main.quit_to_menu()
+		if not await _wait_state(GS.MAIN_MENU, 30.0, "the title after another trip"):
+			return
+		await _frames(60)
+		at_title.append([int(Performance.get_monitor(Performance.OBJECT_COUNT)),
+			int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)),
+			int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT))])
+	print("ui_smoke: objects/orphan nodes/resources at the title after each trip: ", at_title)
+	if int(at_title[1][0]) - int(at_title[0][0]) > 150 or int(at_title[1][1]) > int(at_title[0][1]):
+		failures.append("the previous world stays in memory after leaving it: %s" % str(at_title))
+	log_lines.append("continue_and_quit_twice")

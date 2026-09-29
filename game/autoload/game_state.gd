@@ -1,7 +1,8 @@
 extends Node
 ## Autoload wrapper around GameStateMachine: the only place the global game
-## state changes. Every transition is validated, logged and broadcast on the
-## EventBus; refused transitions are reported to the console and telemetry.
+## state changes. Every transition is validated, logged ("[state] A -> B" on
+## stdout / logcat) and broadcast on the EventBus; refused transitions are
+## reported to the console and telemetry.
 
 const State := GameStateMachine.State
 
@@ -32,7 +33,7 @@ func request(to: int, data: Dictionary = {}) -> bool:
 		Telemetry.track("state_refused", {"from": GameStateMachine.name_of(from), "to": GameStateMachine.name_of(to)})
 		return false
 	payload = data
-	EventBus.state_changed.emit(from, to)
+	_changed(from, to)
 	return true
 
 
@@ -40,7 +41,7 @@ func back() -> bool:
 	var from := fsm.current()
 	if not fsm.back():
 		return false
-	EventBus.state_changed.emit(from, fsm.current())
+	_changed(from, fsm.current())
 	return true
 
 
@@ -48,7 +49,7 @@ func close(s: int) -> bool:
 	var from := fsm.current()
 	if not fsm.close(s):
 		return false
-	EventBus.state_changed.emit(from, fsm.current())
+	_changed(from, fsm.current())
 	return true
 
 
@@ -73,4 +74,9 @@ func fail(message: String) -> void:
 	if not fsm.request(State.ERROR):
 		fsm.overlays.clear()
 		fsm.base = State.ERROR
-	EventBus.state_changed.emit(-1, State.ERROR)
+	_changed(-1, State.ERROR)
+
+
+func _changed(from: int, to: int) -> void:
+	print("[state] %s -> %s" % [GameStateMachine.name_of(from) if from >= 0 else "-", GameStateMachine.name_of(to)])
+	EventBus.state_changed.emit(from, to)

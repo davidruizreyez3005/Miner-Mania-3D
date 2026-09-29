@@ -66,6 +66,11 @@ func camera_rig() -> CameraRig:
 func _boot() -> void:
 	_show_screen(_splash("Waking up the mine..."))
 	await get_tree().process_frame
+	print("[boot] Miner Mania 3D %s on %s: window %s, view %s, %s/%s (%s)" % [
+		String(ProjectSettings.get_setting("application/config/version", "?")), OS.get_name(),
+		str(get_window().size), str(get_viewport().get_visible_rect().size),
+		RenderingServer.get_current_rendering_method(), RenderingServer.get_current_rendering_driver_name(),
+		RenderingServer.get_video_adapter_name()])
 	if Assets.assets.is_empty():
 		GameState.fail("The game's model library is missing. Please reinstall Miner Mania 3D.")
 		return

@@ -4,6 +4,10 @@ name: Android
 # Android APK with the pinned Godot and its checksum-verified export
 # templates, verifies it (structure, package id, version, ABI, signature,
 # packaged content, no secrets) and uploads the APK with its reports.
+# Finally the uploaded APK is installed on an Android emulator (KVM,
+# checksum-verified official packages) and played with real touch input:
+# title screen, new claim, tutorial, camera, pause menu, Back key, autosaves,
+# background/resume - failing on any crash, ANR or engine error.
 # The debug keystore is created fresh for every run and never stored.
 
 on:
@@ -116,5 +120,69 @@ jobs:
             build/godot_import.log
             assets/generated/catalog.json
             assets/manifests/asset_manifest.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  device:
+    name: Play the APK on an Android emulator
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Download the APK built in this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name MinerMania3D-debug-apk --dir build/apk
+          test -s build/apk/MinerMania3D-debug.apk
+          sha256sum build/apk/MinerMania3D-debug.apk
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Install system libraries for the emulator
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends libpulse0
+
+      - name: Install adb, the emulator and the system image (verified)
+        run: |
+          sdk="$RUNNER_TEMP/android-sdk"
+          tools/ci/install_android_sdk.sh "$sdk" >/dev/null
+          tools/ci/install_android_emulator.sh "$sdk"
+          echo "ANDROID_SDK=$sdk" >> "$GITHUB_ENV"
+
+      - name: Boot the emulator (API 30, 720x1280)
+        run: tools/ci/start_android_emulator.sh "$ANDROID_SDK" build/device 600
+
+      - name: Play the APK (touch, gameplay, lifecycle)
+        run: python3 tools/device/device_smoke.py --apk build/apk/MinerMania3D-debug.apk --sdk "$ANDROID_SDK" --out build/device
+
+      - name: Summary
+        if: always()
+        run: |
+          if [[ -f build/device/device_report.md ]]; then
+            cat build/device/device_report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### On-device test: did not run (see the job log)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload device test results
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-test
+          path: build/device
           if-no-files-found: warn
           retention-days: 30

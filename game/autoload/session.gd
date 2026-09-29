@@ -161,7 +161,9 @@ func save_now() -> bool:
 	var meta := sim.state.meta
 	meta["last_save_unix"] = now
 	meta["max_seen_unix"] = maxi(int(meta.get("max_seen_unix", 0)), now)
-	return SaveService.write(sim.state, now)
+	var ok := SaveService.write(sim.state, now)
+	print("[save] %s: claim time %.0f s, money %.0f" % ["written" if ok else "FAILED", sim.state.run_time, sim.state.money])
+	return ok
 
 
 # ------------------------------------------------------------------ running

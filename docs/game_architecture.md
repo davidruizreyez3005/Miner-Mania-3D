@@ -212,4 +212,14 @@ prestige, determinism), saves (round trip, migration, corruption,
 checksums, timestamps), balance (pacing), game state (transitions) and world
 (module definitions, camp layout, full-world placement, navigation, cage
 routes, agents, the foreman, triangle budgets). `tools/godot/ui_smoke.gd`
-boots the real game and plays it end to end.
+boots the real game and plays it end to end, including memory checks
+(opening every panel repeatedly and going into the mine and back must not
+leave objects behind).
+
+`tools/device/device_smoke.py` plays the exported APK on an Android device
+or emulator (CI: API 30 x86_64 image, whose ARM translation runs the arm64
+build unchanged) with real touch input through adb, following the game's
+log lines (`[boot]`, `[state] A -> B`, `[save] ...`): title, new claim,
+tutorial, camera pan (the picture must change), pause menu, Back key,
+autosaves with the claim clock advancing, background and resume in the same
+process, and no crash, ANR or engine error.

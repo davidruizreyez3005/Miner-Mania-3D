@@ -293,7 +293,10 @@ func back() -> bool:
 	if p:
 		close_panel(p)
 		return true
-	if hud.visible and GameState.is_state(GameStateMachine.State.PLAYING):
+	# In play (a tutorial tip may be showing: it steps aside and comes back
+	# when the pause menu closes) Back pauses the game.
+	if hud.visible and GameState.fsm.base == GameStateMachine.State.PLAYING \
+			and (GameState.is_state(GameStateMachine.State.PLAYING) or GameState.is_state(GameStateMachine.State.TUTORIAL)):
 		open_panel("pause")
 		return true
 	return false

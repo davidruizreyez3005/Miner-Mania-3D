@@ -70,6 +70,9 @@ godot --headless --path . --script res://tools/godot/perf_report.gd
 # 5. APK (debug keystore from the Godot editor settings) and its verification
 godot --headless --path . --export-debug Android build/MinerMania3D-debug.apk
 python tools/apk/verify_apk.py build/MinerMania3D-debug.apk --sdk "$ANDROID_HOME"
+# 6. Play it on a device: an emulator (tools/ci/start_android_emulator.sh) or a
+#    phone with USB debugging (720x1280-class portrait screen)
+python tools/device/device_smoke.py --apk build/MinerMania3D-debug.apk --sdk "$ANDROID_HOME" --serial <serial>
 ```
 
 Run the game on desktop with `godot --path .` (mouse emulates touch; WASD,
@@ -81,7 +84,11 @@ Q/E and +/- move the camera).
 - **Validate** - scripts, all test suites, the runtime smoke test and a
   balance report (pull requests; also the first stage of Android).
 - **Android** - on every push: validate, export a debug APK, verify it
-  and upload it with its reports.
+  and upload it with its reports; then install that APK on an Android
+  emulator and play it with touch input - title screen, new claim,
+  tutorial, camera, pause menu, Back key, autosaves, background and resume -
+  failing on any crash, ANR or engine error (report, logcat and screenshots
+  are uploaded).
 - **Release** - on a `v*` tag: a release-signed APK from repository
   secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
   `ANDROID_KEY_ALIAS`), verified and attached to a GitHub release.
