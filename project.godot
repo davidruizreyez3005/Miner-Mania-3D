@@ -53,6 +53,12 @@ window/energy_saving/keep_screen_on=true
 
 [importer_defaults]
 
+texture={
+"compress/mode": 2,
+"detect_3d/compress_to": 0,
+"mipmaps/generate": true,
+"process/size_limit": 1024
+}
 scene={
 "import_script/path": "res://godot/pipeline/asset_post_import.gd"
 }

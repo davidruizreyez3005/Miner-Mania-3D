@@ -143,7 +143,9 @@ func instantiate(id: String, state: String = "", lod: bool = true) -> Node3D:
 	else:
 		for l in a.get("lods", []):
 			lods.append(l["model"])
-	if lod and not lods.is_empty() and not _is_animated(inst):
+	# Phones use Godot's automatic mesh LOD instead of the pipeline's LOD
+	# models (smaller download; mipmaps cover the distant textures).
+	if lod and not lods.is_empty() and not _is_animated(inst) and not OS.has_feature("mobile"):
 		_set_range(inst, 0.0, LOD_DISTANCES[0])
 		for i in lods.size():
 			var lps := scene(String(lods[i]))

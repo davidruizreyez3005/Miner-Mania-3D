@@ -1,0 +1,85 @@
+name: Validate
+
+# Everything that can be checked without a phone: data integrity, script
+# compilation, the automated test suites (economy, save/migration/corruption,
+# offline progression, gameplay, progression, balance, world/module/placement
+# validation, navigation, agents) and an end-to-end runtime smoke test of the
+# real game. Also called by the Android workflow before it builds the APK.
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Data, scripts, tests and runtime smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Prepare the game project
+        id: prep
+        uses: ./.github/actions/prepare-game
+
+      - name: Catalog and export filter are up to date
+        run: python tools/assets/export_filter.py --check
+
+      - name: Compile every script
+        run: |
+          "$GODOT" --headless --path . --script res://tools/godot/check_scripts.gd 2>&1 | tee build/check_scripts.log
+          grep -q ", 0 failed" build/check_scripts.log
+
+      - name: Automated tests
+        run: |
+          mkdir -p build/test-results
+          "$GODOT" --headless --path . --script res://tests/run_tests.gd -- \
+            --junit build/test-results/junit.xml --json build/test-results/results.json 2>&1 | tee build/test-results/tests.log
+
+      - name: Runtime smoke test (boots the real game, plays, opens every screen)
+        run: |
+          "$GODOT" --headless --path . --script res://tools/godot/ui_smoke.gd -- \
+            --report build/test-results/ui_smoke.json 2>&1 | tee build/test-results/ui_smoke.log
+
+      - name: Balance report (6 simulated hours)
+        run: |
+          "$GODOT" --headless --path . --script res://tools/godot/balance_report.gd -- \
+            --hours 6 --json build/test-results/balance.json 2>&1 | tail -n 60 | tee build/test-results/balance.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Validation"
+            echo ""
+            echo "- Asset library from cache: ${{ steps.prep.outputs.assets-cache-hit == 'true' && 'yes' || 'no (built)' }}"
+            grep -h "^check_scripts:" build/check_scripts.log 2>/dev/null | sed 's/^/- /'
+            grep -h "tests, .* passed" build/test-results/tests.log 2>/dev/null | sed 's/^/- /'
+            grep -h "^ui_smoke:" build/test-results/ui_smoke.log 2>/dev/null | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: |
+            build/test-results/
+            build/check_scripts.log
+            build/godot_import.log
+          if-no-files-found: warn
+          retention-days: 30

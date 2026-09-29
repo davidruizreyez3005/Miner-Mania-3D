@@ -1,0 +1,113 @@
+name: Prepare the game project
+description: >
+  Pinned Godot (checksum-verified, cached), the generated 3D asset library
+  (restored from a cache keyed by the asset sources, built with the pinned
+  Blender on a miss), procedural audio and textures, the runtime asset
+  catalog, and the Godot import tuned for mobile (VRAM-compressed textures).
+  Exports GODOT (binary path) and TOOLS_DIR to the environment.
+
+inputs:
+  python-version:
+    description: Python for the asset tools
+    default: "3.11"
+
+outputs:
+  assets-cache-hit:
+    description: "'true' when the asset library came from the cache"
+    value: ${{ steps.assets.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: requirements.txt
+
+    - name: Install pinned Python dependencies
+      shell: bash
+      run: python -m pip install --require-hashes -r requirements.txt
+
+    # Outside the checkout (Godot would import it), as an absolute path:
+    # actions/cache rejects paths containing '..'.
+    - name: Resolve tools directory
+      shell: bash
+      run: echo "TOOLS_DIR=$(realpath -m "$GITHUB_WORKSPACE/../mm-tools")" >> "$GITHUB_ENV"
+
+    - name: Cache pinned Blender and Godot
+      uses: actions/cache@v6
+      with:
+        path: ${{ env.TOOLS_DIR }}
+        key: mm-tools-blender-4.5.14-9ba871ff-godot-4.7.2-9aa00f7a
+
+    - name: Install pinned Godot
+      shell: bash
+      run: echo "GODOT=$(tools/ci/install_godot.sh "$TOOLS_DIR/godot")" >> "$GITHUB_ENV"
+
+    - name: Restore the generated asset library
+      id: assets
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          assets/generated
+          assets/manifests
+        key: generated-assets-v1-${{ hashFiles('blender/**', 'assets/source/**', 'tools/ci/install_blender.sh') }}
+
+    - name: Install system libraries for headless Blender
+      if: steps.assets.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y -q --no-install-recommends \
+          libx11-6 libxrender1 libxfixes3 libxi6 libxkbcommon0 libxcb1 libxext6 \
+          libsm6 libice6 libgl1 libegl1 libxxf86vm1
+
+    - name: Build the asset library (sources changed)
+      if: steps.assets.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        BLENDER="$(tools/ci/install_blender.sh "$TOOLS_DIR/blender")"
+        "$BLENDER" --background --factory-startup --python blender/build.py -- --profile full
+        python tools/validate_assets.py
+
+    - name: Save the asset library
+      if: steps.assets.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          assets/generated
+          assets/manifests
+        key: ${{ steps.assets.outputs.cache-primary-key }}
+
+    - name: Generate sounds, textures and the asset catalog
+      shell: bash
+      run: |
+        python tools/audio/synth.py
+        python tools/textures/texgen.py
+        python tools/assets/build_catalog.py --check
+
+    - name: Restore the Godot import cache
+      uses: actions/cache@v6
+      with:
+        path: |
+          .godot/imported
+          .godot/uid_cache.bin
+          assets/generated/**/*.import
+        key: godot-import-v1-${{ steps.assets.outputs.cache-primary-key }}-${{ hashFiles('project.godot', 'godot/pipeline/**', 'tools/assets/tune_imports.py', 'tools/audio/synth.py', 'tools/textures/texgen.py') }}
+
+    - name: Godot import (mobile texture settings)
+      shell: bash
+      run: |
+        mkdir -p build
+        # First pass writes the .import files, the tuning sets VRAM compression
+        # and size caps, the second pass re-imports what changed.
+        "$GODOT" --headless --path . --import > build/godot_import.log 2>&1 || true
+        python tools/assets/tune_imports.py
+        "$GODOT" --headless --path . --import >> build/godot_import.log 2>&1
+        python tools/assets/tune_imports.py --check
+        if sed 's/\x1b\[[0-9;]*m//g' build/godot_import.log | grep -E "^(ERROR|SCRIPT ERROR)"; then
+          echo "Godot reported import errors" >&2
+          exit 1
+        fi

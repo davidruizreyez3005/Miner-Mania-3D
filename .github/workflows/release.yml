@@ -1,0 +1,143 @@
+name: Release
+
+# Builds a release-signed APK for a version tag (v1.2.3) or on demand and
+# attaches it to a GitHub release. Signing material comes only from GitHub
+# Secrets and is never written to the repository or printed:
+#
+#   ANDROID_KEYSTORE_BASE64   base64 of the release keystore (.jks/.keystore)
+#   ANDROID_KEYSTORE_PASSWORD keystore password
+#   ANDROID_KEY_ALIAS         key alias
+#
+# The keystore lives in the runner's temp directory for the export only; the
+# password reaches Godot through its GODOT_ANDROID_KEYSTORE_RELEASE_*
+# environment variables, and the APK is scanned to prove none of it leaked.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version name (e.g. 1.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+    permissions:
+      contents: read
+
+  release:
+    name: Signed release APK
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      VERSION_NAME: ${{ github.event.inputs.version || github.ref_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Check the signing secrets are configured
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KA: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          missing=()
+          [[ -n "$KS" ]] || missing+=(ANDROID_KEYSTORE_BASE64)
+          [[ -n "$KP" ]] || missing+=(ANDROID_KEYSTORE_PASSWORD)
+          [[ -n "$KA" ]] || missing+=(ANDROID_KEY_ALIAS)
+          if (( ${#missing[@]} )); then
+            echo "::error title=Release signing not configured::Add these repository secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Prepare the game project
+        uses: ./.github/actions/prepare-game
+
+      - name: Cache the Android SDK and export templates
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.TOOLS_DIR }}/android-sdk
+            ${{ env.TOOLS_DIR }}/godot-templates
+          key: android-sdk-bt35.0.0-pt37.0.1-templates-4.7.2-${{ hashFiles('tools/ci/install_android_sdk.sh', 'tools/ci/install_godot_templates.sh') }}
+
+      - name: Install the Android SDK and export templates (verified)
+        run: |
+          echo "ANDROID_SDK=$(tools/ci/install_android_sdk.sh "$TOOLS_DIR/android-sdk")" >> "$GITHUB_ENV"
+          tools/ci/install_godot_templates.sh "$TOOLS_DIR/godot-templates"
+
+      - name: Set the version
+        run: |
+          name="${VERSION_NAME#v}"
+          [[ "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version '$name' is not semantic (x.y.z)"; exit 1; }
+          sed -i "s/^version\/name=.*/version\/name=\"$name\"/; s/^version\/code=.*/version\/code=${{ github.run_number }}/" export_presets.cfg
+          sed -i "s/^config\/version=.*/config\/version=\"$name\"/" project.godot
+          echo "APP_VERSION=$name" >> "$GITHUB_ENV"
+
+      - name: Export the signed release APK
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KA: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "::add-mask::$KP"
+          java_home="${JAVA_HOME_17_X64:-$JAVA_HOME}"
+          python tools/ci/configure_godot_android.py --sdk "$ANDROID_SDK" --java "$java_home"
+          keystore="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$KS" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          mkdir -p build/apk
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$keystore" \
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER="$KA" \
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$KP" \
+            "$GODOT" --headless --path . --export-release "Android" "build/apk/MinerMania3D-$APP_VERSION.apk" > build/apk/export.log 2>&1 \
+            || { rm -f "$keystore"; cat build/apk/export.log; exit 1; }
+          rm -f "$keystore"
+          test -s "build/apk/MinerMania3D-$APP_VERSION.apk"
+
+      - name: Verify the release APK (including a leak scan for the signing secrets)
+        env:
+          SECRET_VALUES: |
+            ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+            ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python tools/apk/verify_apk.py "build/apk/MinerMania3D-$APP_VERSION.apk" --sdk "$ANDROID_SDK" --expect-release \
+            --report build/apk/apk_report.json --manifest build/apk/apk_manifest.json
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$APP_VERSION"
+          notes="Miner Mania 3D $APP_VERSION - signed Android APK (arm64-v8a). SHA-256: $(sha256sum "build/apk/MinerMania3D-$APP_VERSION.apk" | cut -d' ' -f1)"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" "build/apk/MinerMania3D-$APP_VERSION.apk" build/apk/apk_report.json --clobber
+          else
+            gh release create "$tag" "build/apk/MinerMania3D-$APP_VERSION.apk" build/apk/apk_report.json \
+              --title "Miner Mania 3D $APP_VERSION" --notes "$notes" --target "$GITHUB_SHA"
+          fi
+
+      - name: Upload the release APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: MinerMania3D-release-apk
+          path: |
+            build/apk/*.apk
+            build/apk/apk_report.json
+            build/apk/apk_manifest.json
+          if-no-files-found: error
+          retention-days: 90

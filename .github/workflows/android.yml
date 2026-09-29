@@ -1,0 +1,120 @@
+name: Android
+
+# Validates the game (the Validate workflow), then exports a debug-signed
+# Android APK with the pinned Godot and its checksum-verified export
+# templates, verifies it (structure, package id, version, ABI, signature,
+# packaged content, no secrets) and uploads the APK with its reports.
+# The debug keystore is created fresh for every run and never stored.
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+
+  apk:
+    name: Build and verify the APK
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Prepare the game project
+        uses: ./.github/actions/prepare-game
+
+      - name: Cache the Android SDK and export templates
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.TOOLS_DIR }}/android-sdk
+            ${{ env.TOOLS_DIR }}/godot-templates
+          key: android-sdk-bt35.0.0-pt37.0.1-templates-4.7.2-${{ hashFiles('tools/ci/install_android_sdk.sh', 'tools/ci/install_godot_templates.sh') }}
+
+      - name: Install the Android SDK (verified)
+        run: echo "ANDROID_SDK=$(tools/ci/install_android_sdk.sh "$TOOLS_DIR/android-sdk")" >> "$GITHUB_ENV"
+
+      - name: Install the Godot export templates (verified)
+        run: tools/ci/install_godot_templates.sh "$TOOLS_DIR/godot-templates"
+
+      - name: Configure Godot for Android export
+        run: |
+          java_home="${JAVA_HOME_17_X64:-$JAVA_HOME}"
+          test -x "$java_home/bin/java"
+          keystore="$RUNNER_TEMP/debug.keystore"
+          "$java_home/bin/keytool" -genkeypair -keystore "$keystore" -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Android Debug,O=Android,C=US" -noprompt
+          python tools/ci/configure_godot_android.py --sdk "$ANDROID_SDK" --java "$java_home" --debug-keystore "$keystore"
+
+      - name: Export the debug APK
+        run: |
+          mkdir -p build/apk
+          "$GODOT" --headless --path . --export-debug "Android" build/apk/MinerMania3D-debug.apk 2>&1 | tee build/apk/export.log
+          test -s build/apk/MinerMania3D-debug.apk
+
+      - name: Verify the APK
+        run: |
+          python tools/apk/verify_apk.py build/apk/MinerMania3D-debug.apk --sdk "$ANDROID_SDK" \
+            --report build/apk/apk_report.json --manifest build/apk/apk_manifest.json | tee build/apk/verify.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Android APK"
+            echo ""
+            if [[ -f build/apk/apk_report.json ]]; then
+              python - <<'PY'
+          import json
+          r = json.load(open("build/apk/apk_report.json"))
+          print(f"- **{r.get('package','?')}** {r.get('version_name','?')} ({r.get('version_code','?')}), {r.get('size_mb','?')} MB, ABI {', '.join(r.get('abis', []))}")
+          print(f"- min SDK {r.get('min_sdk','?')}, target SDK {r.get('target_sdk','?')}, signed by `{r.get('signer','?')}`")
+          print(f"- verification: {'PASSED' if r.get('passed') else 'FAILED'}")
+          print(f"- size by kind (MB): {r.get('size_by_kind_mb', {})}")
+          PY
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: MinerMania3D-debug-apk
+          path: build/apk/MinerMania3D-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload APK reports and logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk-reports
+          path: |
+            build/apk/apk_report.json
+            build/apk/apk_manifest.json
+            build/apk/export.log
+            build/apk/verify.log
+            build/godot_import.log
+            assets/generated/catalog.json
+            assets/manifests/asset_manifest.json
+          if-no-files-found: warn
+          retention-days: 30
