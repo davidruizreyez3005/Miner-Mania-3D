@@ -160,24 +160,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: shipped arm64-v8a APK, Vulkan
-            key: arm64-vulkan
+          - name: shipped arm64-v8a APK, OpenGL ES
+            key: arm64-gles
             artifact: MinerMania3D-debug-apk
             apk: MinerMania3D-debug.apk
-            graphics: lavapipe
-            driver: vulkan
-          - name: x86_64 twin, Vulkan
-            key: x86_64-vulkan
-            artifact: MinerMania3D-x86_64-emulator-apk
-            apk: MinerMania3D-x86_64-emulator.apk
-            graphics: lavapipe
-            driver: vulkan
-          - name: x86_64 twin, OpenGL ES fallback
+            graphics: gles
+            driver: opengl3
+          - name: x86_64 twin, OpenGL ES
             key: x86_64-gles
             artifact: MinerMania3D-x86_64-emulator-apk
             apk: MinerMania3D-x86_64-emulator.apk
-            graphics: no-vulkan
+            graphics: gles
             driver: opengl3
+          - name: x86_64 twin, Vulkan (native swapchain)
+            key: x86_64-vulkan
+            artifact: MinerMania3D-x86_64-emulator-apk
+            apk: MinerMania3D-x86_64-emulator.apk
+            graphics: vulkan-native-swapchain
+            driver: vulkan
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

@@ -7,20 +7,27 @@
 #
 #   tools/ci/start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [graphics]
 #
-# graphics: lavapipe (default; Mesa's software Vulkan), swiftshader, or
-# no-vulkan (SwiftShader GLES only - apps fall back to OpenGL ES).
+# graphics (all software, the runners have no GPU):
+#   gles                     no Vulkan in the guest - apps take their OpenGL ES
+#                            path - with GLES from the lavapipe/llvmpipe backend
+#   gles-swiftshader         the same with SwiftShader GLES (its translator
+#                            allows only 261 fragment uniform vectors)
+#   lavapipe | swiftshader   Vulkan (gfxstream) on Mesa lavapipe / SwiftShader
+#   vulkan-native-swapchain  lavapipe with the emulator's native swapchain
 # Needs /dev/kvm (hardware acceleration). Prints the device serial.
 set -euo pipefail
 
-usage="usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [lavapipe|swiftshader|no-vulkan]"
+usage="usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [graphics]"
 sdk="${1:?$usage}"
 logs="${2:?$usage}"
 timeout_s="${3:-600}"
-graphics="${4:-lavapipe}"
+graphics="${4:-gles}"
 case "$graphics" in
+  gles) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe -feature -Vulkan) ;;
+  gles-swiftshader) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect -feature -Vulkan) ;;
   lavapipe) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe) ;;
   swiftshader) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect) ;;
-  no-vulkan) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect -feature -Vulkan) ;;
+  vulkan-native-swapchain) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe -feature VulkanNativeSwapchain,GuestAngle) ;;
   *) echo "$usage" >&2; exit 2 ;;
 esac
 avd_name="mm3d_api35"
