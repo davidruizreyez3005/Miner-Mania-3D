@@ -41,6 +41,11 @@ LOG_RE = re.compile(r"^\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+\s+(\d+)\s+(\d+)\s+([VDIWE
 BOOT_RE = re.compile(r"\[boot\] (.*) window \((\d+), (\d+)\), view \(([\d.]+), ([\d.]+)\), (.*)$")
 SAVE_RE = re.compile(r"\[save\] (written|FAILED): claim time (\d+) s, money (\d+)")
 GODOT_ERROR_PREFIXES = ("SCRIPT ERROR", "USER SCRIPT ERROR", "ERROR", "USER ERROR")
+# What Godot logs when it probes Vulkan on a device without it and switches to
+# OpenGL ES (only accepted when the run is meant to test that fallback).
+VULKAN_PROBE_ERRORS = ("vkEnumeratePhysicalDevices reported zero accessible devices",
+                       "rendering_context_driver_vulkan.cpp")
+FRAME_STATS_RE = re.compile(r"app_time_stats: avg=([\d.]+)ms")
 
 
 def targets(w: float, h: float) -> dict:
@@ -152,8 +157,15 @@ class Logcat:
                 raise Failure(f"timed out after {timeout:.0f}s waiting for '{pattern}'")
             time.sleep(0.25)
 
-    def problems(self) -> dict:
-        crashes, errors, gaps = [], [], []
+    def frame_ms(self, pid: str) -> float | None:
+        """Median frame time the emulator's GL layer reports for the game."""
+        with self.lock:
+            vals = [float(m.group(1)) for e in self.lines if e["pid"] == pid
+                    for m in [FRAME_STATS_RE.search(e["msg"])] if m]
+        return sorted(vals)[len(vals) // 2] if vals else None
+
+    def problems(self, allowed: tuple = ()) -> dict:
+        crashes, errors, gaps, expected = [], [], [], []
         with self.lock:
             lines = list(self.lines)
         for i, e in enumerate(lines):
@@ -168,9 +180,14 @@ class Logcat:
                                                 (f"Process {PACKAGE}" in msg and "has died" in msg)):
                 crashes.append(msg)
             elif tag == "godot" and e["prio"] in ("E", "F") and msg.lstrip().startswith(GODOT_ERROR_PREFIXES):
-                where = lines[i + 1]["msg"].strip() if i + 1 < len(lines) and lines[i + 1]["tag"] == "godot" else ""
-                errors.append(f"{msg.strip()} {where}".strip())
-        return {"crashes": crashes, "errors": errors, "translation_gaps": gaps}
+                where = ""
+                for j in range(i + 1, min(i + 6, len(lines))):
+                    if lines[j]["tag"] == "godot" and lines[j]["msg"].strip().startswith("at:"):
+                        where = lines[j]["msg"].strip()
+                        break
+                text = f"{msg.strip()} {where}".strip()
+                (expected if any(a in text for a in allowed) else errors).append(text)
+        return {"crashes": crashes, "errors": errors, "translation_gaps": gaps, "expected_messages": expected}
 
     def close(self) -> None:
         self.proc.terminate()
@@ -182,15 +199,15 @@ class Logcat:
         self.file.close()
 
 
-def frame_diff(a: tuple, b: tuple, top: int, bottom: int) -> float:
+def frame_diff(a: tuple, b: tuple, top: int, bottom: int, right: int = 0) -> float:
     """Mean absolute grey-level difference (0-255) between two frames over the
-    rows [top, h - bottom), sampled on an 8-pixel grid."""
+    rows [top, h - bottom) and columns [0, w - right), on an 8-pixel grid."""
     w, h, pa = a
     _, _, pb = b
     total, n = 0, 0
     for y in range(top, h - bottom, 8):
         row = y * w * 4
-        for x in range(0, w, 8):
+        for x in range(0, w - right, 8):
             i = row + x * 4
             ga = pa[i] * 3 + pa[i + 1] * 6 + pa[i + 2]
             gb = pb[i] * 3 + pb[i + 1] * 6 + pb[i + 2]
@@ -288,12 +305,16 @@ class Run:
         driver = m.group(6).split(" ")[0].split("/")[-1]
         if self.args.expect_driver and driver != self.args.expect_driver:
             raise Failure(f"the game runs on {driver}, expected {self.args.expect_driver}: {m.group(6)}")
+        first = self.dev.frame()
         self.log.wait(r"^\[state\] BOOT -> MAIN_MENU", self.t(300))
         self.report["title_s"] = round(time.monotonic() - t0, 1)
         self.pid0 = self.dev.pid()
         if not self.pid0:
             raise Failure("the game process is not running")
-        time.sleep(self.t(3))
+        # The splash stays up until the title's first frame is drawn.
+        end = time.monotonic() + self.t(30)
+        while time.monotonic() < end and frame_diff(first, self.dev.frame(), 0, 0) < 3.0:
+            time.sleep(1.0)
         self.shot("title")
         return f"title screen after {self.report['title_s']}s; {m.group(6)}; window {int(win[0])}x{int(win[1])}"
 
@@ -320,19 +341,27 @@ class Run:
         return "tap on Skip tips closed the tutorial"
 
     def camera(self) -> str:
-        top, bottom = int(150 * self.scale[1]), int(300 * self.scale[1])
+        # Compare only the 3D view between the toasts (top) and the action
+        # buttons (bottom), left of the level strip: HUD numbers and toasts
+        # change on their own.
+        region = (int(260 * self.scale[1]), int(330 * self.scale[1]), int(120 * self.scale[0]))
         still_a = self.dev.frame()
-        time.sleep(self.t(2))
-        still_b = self.dev.frame()
-        idle = frame_diff(still_a, still_b, top, bottom)
-        w, h = self.dev.frame()[0:2]
-        self.dev.swipe((w * 0.72, h * 0.55), (w * 0.28, h * 0.40), 700)
         time.sleep(self.t(3))
-        moved = self.dev.frame()
-        pan = frame_diff(still_b, moved, top, bottom)
+        still_b = self.dev.frame()
+        idle = frame_diff(still_a, still_b, *region)
+        w, h = still_b[0:2]
+        self.dev.swipe((w * 0.72, h * 0.55), (w * 0.28, h * 0.40), 700)
+        # Software-rendered emulators draw a frame every second or two: poll.
+        pan, end = 0.0, time.monotonic() + self.t(45)
+        need = max(3.0 * idle, 6.0)
+        while time.monotonic() < end:
+            time.sleep(1.5)
+            pan = max(pan, frame_diff(still_b, self.dev.frame(), *region))
+            if pan >= need:
+                break
         self.shot("camera_pan")
         self.report["camera"] = {"idle_diff": round(idle, 2), "pan_diff": round(pan, 2)}
-        if pan < max(3.0 * idle, 6.0):
+        if pan < need:
             raise Failure(f"the picture barely changed after a pan swipe (diff {pan:.1f}, idle {idle:.1f})")
         return f"pan swipe moved the view (image difference {pan:.1f} vs {idle:.1f} idle)"
 
@@ -359,7 +388,9 @@ class Run:
         mark = self.log.mark()
         saves = []
         idx = mark
-        end = time.monotonic() + self.t(150)
+        # The mine runs in real time on a phone; software-rendered emulators
+        # draw so slowly that the capped frame step makes it run slower.
+        end = time.monotonic() + self.t(420)
         while len(saves) < 2:
             msg, idx = self.log.wait(r"^\[save\] ", max(1.0, end - time.monotonic()), idx)
             m = SAVE_RE.search(msg)
@@ -420,10 +451,13 @@ class Run:
             print(f"FAILED: adb timed out: {e}", flush=True)
         time.sleep(1)
         if self.log:
-            probs = self.log.problems()
+            allowed = VULKAN_PROBE_ERRORS if self.args.expect_driver == "opengl3" else ()
+            probs = self.log.problems(allowed)
             self.report["crashes"] = probs["crashes"]
             self.report["engine_errors"] = probs["errors"]
+            self.report["expected_fallback_messages"] = probs["expected_messages"]
             self.report["translation_gaps"] = probs["translation_gaps"]
+            self.report["emulator_frame_ms_median"] = self.log.frame_ms(getattr(self, "pid0", "") or "")
             self.report["game_log"] = self.log.game()[-400:]
             self.log.close()
             if probs["crashes"]:
@@ -449,7 +483,8 @@ class Run:
             lines.append(f"- {PACKAGE} {r.get('version_name', '?')} on `{r.get('primary_abi', '?')}`, "
                          f"window {r.get('window')}, renderer {r.get('renderer')}")
         for k, label in (("title_s", "title screen after launch"), ("world_load_s", "world loaded after tap"),
-                         ("memory_pss_mb", "memory PSS (MB)")):
+                         ("memory_pss_mb", "memory PSS (MB)"),
+                         ("emulator_frame_ms_median", "frame time on this software-rendered emulator (ms, median)")):
             if r.get(k) is not None:
                 lines.append(f"- {label}: {r[k]}")
         lines += ["", "| Step | Result | Time | Detail |", "| --- | --- | --- | --- |"]
@@ -461,6 +496,9 @@ class Run:
         if r.get("translation_gaps"):
             lines += ["", "**ARM translation gap:** the emulator's ndk_translation cannot execute an instruction of "
                       "the arm64 engine binary (`" + r["translation_gaps"][0] + "`); real arm64 devices run it natively."]
+        if r.get("expected_fallback_messages"):
+            lines += ["", f"Expected while switching to OpenGL ES ({len(r['expected_fallback_messages'])}): "
+                      + "; ".join(f"`{m[:120]}`" for m in r["expected_fallback_messages"][:3])]
         if r.get("engine_errors"):
             lines += ["", f"**Engine/script errors ({len(r['engine_errors'])}):**", ""]
             lines += [f"- `{e[:300]}`" for e in r["engine_errors"][:15]]

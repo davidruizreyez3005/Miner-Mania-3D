@@ -129,6 +129,28 @@ jobs:
           retention-days: 7
           compression-level: 0
 
+      # Experiment: the emulator's Vulkan presentation fails with Godot; this
+      # build (the twin plus an override.cfg without Android frame pacing /
+      # Swappy) tests whether pacing is the trigger. Not a release artifact.
+      - name: Export the frame-pacing experiment build
+        run: |
+          printf '[display]\n\nwindow/frame_pacing/android/enable_frame_pacing=false\n' > override.cfg
+          python tools/apk/add_emulator_preset.py --name "Android x86_64 (no frame pacing)" --extra-include override.cfg
+          "$GODOT" --headless --path . --export-debug "Android x86_64 (no frame pacing)" \
+            build/apk/MinerMania3D-x86_64-nopacing.apk 2>&1 | tee build/apk/export_nopacing.log
+          git checkout -- export_presets.cfg
+          rm -f override.cfg
+          unzip -p build/apk/MinerMania3D-x86_64-nopacing.apk assets/override.cfg
+
+      - name: Upload the frame-pacing experiment build
+        uses: actions/upload-artifact@v7
+        with:
+          name: MinerMania3D-x86_64-nopacing-apk
+          path: build/apk/MinerMania3D-x86_64-nopacing.apk
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
       - name: Upload APK reports and logs
         if: always()
         continue-on-error: true
@@ -172,11 +194,11 @@ jobs:
             apk: MinerMania3D-x86_64-emulator.apk
             graphics: gles
             driver: opengl3
-          - name: x86_64 twin, Vulkan (native swapchain)
-            key: x86_64-vulkan
-            artifact: MinerMania3D-x86_64-emulator-apk
-            apk: MinerMania3D-x86_64-emulator.apk
-            graphics: vulkan-native-swapchain
+          - name: x86_64 twin without frame pacing, Vulkan (experiment)
+            key: x86_64-nopacing-vulkan
+            artifact: MinerMania3D-x86_64-nopacing-apk
+            apk: MinerMania3D-x86_64-nopacing.apk
+            graphics: lavapipe
             driver: vulkan
     steps:
       - name: Checkout repository
