@@ -29,6 +29,7 @@ var clip := ""
 var detail := DETAIL_FULL
 var on_screen := true
 var underground := false            # lit by the gallery lamps instead of the sun
+var always_animate := false         # the player's foreman: gameplay rides on its clip events
 var _events: Array = []              # [[time, name]] of the current clip
 var _prev_pos := 0.0
 var _manual_acc := 0.0
@@ -174,7 +175,7 @@ func set_detail(level: int) -> void:
 func _apply_detail() -> void:
 	if anim == null:
 		return
-	var lv := detail if on_screen else DETAIL_FROZEN
+	var lv := detail if on_screen or always_animate else DETAIL_FROZEN
 	anim.active = lv != DETAIL_FROZEN
 	anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL if lv == DETAIL_REDUCED \
 		else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE

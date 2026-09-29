@@ -206,6 +206,20 @@ func sync(delta: float) -> void:
 			smoke.emitting = worn
 
 
+var _faded := false
+
+
+## Camera obstruction handling: see-through while in front of the focus.
+func set_faded(on: bool) -> void:
+	if on == _faded:
+		return
+	_faded = on
+	for u in units:
+		for gi in (u as Node).find_children("*", "GeometryInstance3D", true, false):
+			var g := gi as GeometryInstance3D
+			create_tween().tween_property(g, "transparency", 0.72 if on else 0.0, 0.25)
+
+
 ## Footprints agents walk around: [centre xz, half extents xz, yaw] per
 ## visual unit, or the fenced construction site while unbuilt.
 func blocked_boxes() -> Array:

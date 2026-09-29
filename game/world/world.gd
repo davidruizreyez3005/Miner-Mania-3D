@@ -9,7 +9,8 @@ extends Node3D
 signal rebuilt
 signal facilities_changed
 
-const PICK_LAYER := 1 << 1        # physics layer for tap targets
+const PICK_LAYER := 1 << 1        # physics layer for tap targets (veins, workers, buildings)
+const PICK_AREA_LAYER := 1 << 2   # large tap areas (whole galleries), picked last
 
 var sim: Simulation
 var content: ContentDB
@@ -75,7 +76,9 @@ func steps() -> Array:
 		["Setting up camp", _build_surface_dressing],
 		["Planting the hills", _build_decor],
 		["Calling the crews", _build_agents],
-		["Lighting the lamps", func() -> void: sync(0.0)],
+		["Lighting the lamps", func() -> void:
+			built = true
+			sync(0.0)],
 	]
 
 
@@ -388,8 +391,11 @@ func sync(delta: float) -> void:
 	sales_view.sync(delta)
 
 
+var built := false                       # set once every build step ran
+
+
 func _process(delta: float) -> void:
-	if sim != null:
+	if sim != null and built:
 		sync(delta)
 
 

@@ -56,11 +56,15 @@ func close(s: int) -> bool:
 func open_overlay(s: int, data: Dictionary = {}) -> bool:
 	if fsm.has(s):
 		return true
-	if request(s, data):
-		return true
 	while not fsm.overlays.is_empty() and not fsm.can(s):
 		back()
 	return request(s, data)
+
+
+## Closes every overlay (e.g. before leaving to the title screen).
+func clear_overlays() -> void:
+	while not fsm.overlays.is_empty():
+		back()
 
 
 func fail(message: String) -> void:

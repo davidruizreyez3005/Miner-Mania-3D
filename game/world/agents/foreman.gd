@@ -27,6 +27,8 @@ func setup_foreman(m: AgentManager, asset_id: String) -> void:
 	outfit = asset_id
 	name = "Foreman"
 	setup_agent(m.nav, asset_id)
+	rig.always_animate = true
+	rig.set_detail(CharacterRig.DETAIL_FULL)
 	rider_slot = 5
 	arrived.connect(_on_arrived)
 	rig.clip_event.connect(_on_clip_event)
