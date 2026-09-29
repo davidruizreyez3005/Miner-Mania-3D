@@ -50,6 +50,7 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 window/energy_saving/keep_screen_on=true
+window/frame_pacing/android/enable_frame_pacing=false
 
 [importer_defaults]
 

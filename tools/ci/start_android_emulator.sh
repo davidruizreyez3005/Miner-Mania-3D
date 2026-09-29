@@ -7,27 +7,23 @@
 #
 #   tools/ci/start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [graphics]
 #
-# graphics (all software, the runners have no GPU):
-#   gles                     no Vulkan in the guest - apps take their OpenGL ES
-#                            path - with GLES from the lavapipe/llvmpipe backend
-#   gles-swiftshader         the same with SwiftShader GLES (its translator
-#                            allows only 261 fragment uniform vectors)
-#   lavapipe | swiftshader   Vulkan (gfxstream) on Mesa lavapipe / SwiftShader
-#   vulkan-native-swapchain  lavapipe with the emulator's native swapchain
+# graphics (software - CI runners have no GPU):
+#   lavapipe  Vulkan through the emulator's virtual GPU on Mesa lavapipe
+#             (default). Apps using Android frame pacing (Swappy) fail to
+#             present there; the game ships with it off.
+#   gles      no Vulkan in the guest, so apps take their OpenGL ES path
+#             (GLES through ANGLE on the same software backend).
 # Needs /dev/kvm (hardware acceleration). Prints the device serial.
 set -euo pipefail
 
-usage="usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [graphics]"
+usage="usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [lavapipe|gles]"
 sdk="${1:?$usage}"
 logs="${2:?$usage}"
 timeout_s="${3:-600}"
-graphics="${4:-gles}"
+graphics="${4:-lavapipe}"
 case "$graphics" in
-  gles) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe -feature -Vulkan) ;;
-  gles-swiftshader) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect -feature -Vulkan) ;;
   lavapipe) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe) ;;
-  swiftshader) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect) ;;
-  vulkan-native-swapchain) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe -feature VulkanNativeSwapchain,GuestAngle) ;;
+  gles) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe -feature -Vulkan) ;;
   *) echo "$usage" >&2; exit 2 ;;
 esac
 avd_name="mm3d_api35"

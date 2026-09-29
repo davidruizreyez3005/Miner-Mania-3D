@@ -87,10 +87,10 @@ Q/E and +/- move the camera).
   and upload it with its reports; then play it on an Android 15 emulator
   with touch input - title screen, new claim, tutorial, camera, pause menu,
   Back key, autosaves, background and resume - failing on any crash, ANR or
-  engine error (report, logcat and screenshots are uploaded). Both the
-  shipped arm64-v8a APK (through the emulator's ARM translation) and its
-  x86_64 twin (same preset and game files, proven identical, native on the
-  emulator) are played.
+  engine error (report, logcat and screenshots are uploaded). Played: the
+  shipped arm64-v8a APK (through the emulator's ARM translation) on Vulkan
+  and on the OpenGL ES fallback, and its x86_64 twin (same preset and game
+  files, proven identical, native on the emulator) on Vulkan.
 - **Release** - on a `v*` tag: a release-signed APK from repository
   secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
   `ANDROID_KEY_ALIAS`), verified and attached to a GitHub release.

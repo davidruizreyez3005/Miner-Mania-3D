@@ -200,7 +200,10 @@ calls and ~0.75 M triangles with ~100 MB of texture memory. Mobile specifics:
 VRAM-compressed textures capped at 1024/512 px, Godot mesh LOD instead of
 pipeline LOD models, crew LOD characters, MultiMesh batching for dressing,
 visibility ranges, animation throttling, threaded model preloading, and a
-30/60 fps setting.
+30/60 fps setting. Android frame pacing (Swappy) is off: on the emulator's
+virtual Vulkan GPU the first present after Swappy starts fails and the
+render loop stalls, while Godot's standard presentation works on Vulkan and
+OpenGL ES alike.
 
 ## Testing
 
@@ -222,7 +225,8 @@ lines (`[boot]`, `[state] A -> B`, `[save] ...`): title, new claim,
 tutorial, camera pan (the picture must change), pause menu, Back key,
 autosaves with the claim clock advancing, background and resume in the same
 process, and no crash, ANR or engine error. CI runs it on an Android 15
-x86_64 emulator twice: with the shipped arm64-v8a APK (through the image's
-ARM translation) and with an x86_64 twin exported from a copy of the same
-preset, which `tools/apk/compare_content.py` proves identical apart from
-the engine's native library.
+x86_64 emulator with software graphics: the shipped arm64-v8a APK (through
+the image's ARM translation) on Vulkan and on the OpenGL ES fallback (the
+emulator without Vulkan), and an x86_64 twin exported from a copy of the
+same preset - `tools/apk/compare_content.py` proves it identical apart from
+the engine's native library - on Vulkan.

@@ -5,13 +5,14 @@ name: Android
 # templates, verifies it (structure, package id, version, ABI, signature,
 # packaged content, no secrets) and uploads the APK with its reports.
 # Finally the game is installed on an Android 15 emulator (KVM,
-# checksum-verified official packages) and played with real touch input:
-# title screen, new claim, tutorial, camera, pause menu, Back key, autosaves,
-# background/resume - failing on any crash, ANR or engine error. Two builds
-# are played: the shipped arm64-v8a APK (through the emulator's ARM
-# translation) and its x86_64 twin (same preset, native on the emulator;
-# tools/apk/compare_content.py proves every non-native-library file of the
-# two APKs is identical).
+# checksum-verified official packages, software graphics) and played with
+# real touch input: title screen, new claim, tutorial, camera, pause menu,
+# Back key, autosaves, background/resume - failing on any crash, ANR or
+# engine error. Played: the shipped arm64-v8a APK (through the emulator's
+# ARM translation) on Vulkan and on the OpenGL ES fallback, and its x86_64
+# twin on Vulkan (same preset, native on the emulator;
+# tools/apk/compare_content.py proves every file outside the native
+# libraries is identical to the shipped APK).
 # The debug keystore is created fresh for every run and never stored.
 
 on:
@@ -129,28 +130,6 @@ jobs:
           retention-days: 7
           compression-level: 0
 
-      # Experiment: the emulator's Vulkan presentation fails with Godot; this
-      # build (the twin plus an override.cfg without Android frame pacing /
-      # Swappy) tests whether pacing is the trigger. Not a release artifact.
-      - name: Export the frame-pacing experiment build
-        run: |
-          printf '[display]\n\nwindow/frame_pacing/android/enable_frame_pacing=false\n' > override.cfg
-          python tools/apk/add_emulator_preset.py --name "Android x86_64 (no frame pacing)" --extra-include override.cfg
-          "$GODOT" --headless --path . --export-debug "Android x86_64 (no frame pacing)" \
-            build/apk/MinerMania3D-x86_64-nopacing.apk 2>&1 | tee build/apk/export_nopacing.log
-          git checkout -- export_presets.cfg
-          rm -f override.cfg
-          unzip -p build/apk/MinerMania3D-x86_64-nopacing.apk assets/override.cfg
-
-      - name: Upload the frame-pacing experiment build
-        uses: actions/upload-artifact@v7
-        with:
-          name: MinerMania3D-x86_64-nopacing-apk
-          path: build/apk/MinerMania3D-x86_64-nopacing.apk
-          if-no-files-found: error
-          retention-days: 3
-          compression-level: 0
-
       - name: Upload APK reports and logs
         if: always()
         continue-on-error: true
@@ -174,7 +153,7 @@ jobs:
     name: Play on an Android emulator (${{ matrix.name }})
     needs: apk
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read
@@ -182,24 +161,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: shipped arm64-v8a APK, OpenGL ES
+          - name: shipped arm64-v8a APK, Vulkan
+            key: arm64-vulkan
+            artifact: MinerMania3D-debug-apk
+            apk: MinerMania3D-debug.apk
+            graphics: lavapipe
+            driver: vulkan
+          - name: x86_64 twin, Vulkan
+            key: x86_64-vulkan
+            artifact: MinerMania3D-x86_64-emulator-apk
+            apk: MinerMania3D-x86_64-emulator.apk
+            graphics: lavapipe
+            driver: vulkan
+          - name: shipped arm64-v8a APK, OpenGL ES fallback
             key: arm64-gles
             artifact: MinerMania3D-debug-apk
             apk: MinerMania3D-debug.apk
             graphics: gles
             driver: opengl3
-          - name: x86_64 twin, OpenGL ES
-            key: x86_64-gles
-            artifact: MinerMania3D-x86_64-emulator-apk
-            apk: MinerMania3D-x86_64-emulator.apk
-            graphics: gles
-            driver: opengl3
-          - name: x86_64 twin without frame pacing, Vulkan (experiment)
-            key: x86_64-nopacing-vulkan
-            artifact: MinerMania3D-x86_64-nopacing-apk
-            apk: MinerMania3D-x86_64-nopacing.apk
-            graphics: lavapipe
-            driver: vulkan
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -237,7 +216,7 @@ jobs:
       - name: Play the game (touch, gameplay, lifecycle)
         run: |
           python3 tools/device/device_smoke.py --apk "build/apk/${{ matrix.apk }}" --sdk "$ANDROID_SDK" \
-            --out build/device --label "${{ matrix.name }}" --expect-driver "${{ matrix.driver }}"
+            --out build/device --label "${{ matrix.name }}" --expect-driver "${{ matrix.driver }}" --slow 3
 
       - name: Summary
         if: always()

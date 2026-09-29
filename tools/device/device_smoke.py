@@ -232,6 +232,7 @@ class Run:
         self.slow = args.slow
 
     def t(self, s: float) -> float:
+        """A wait limit, scaled for slow devices (fixed pauses are not)."""
         return s * self.slow
 
     def step(self, name: str, fn) -> None:
@@ -305,15 +306,15 @@ class Run:
         driver = m.group(6).split(" ")[0].split("/")[-1]
         if self.args.expect_driver and driver != self.args.expect_driver:
             raise Failure(f"the game runs on {driver}, expected {self.args.expect_driver}: {m.group(6)}")
-        first = self.dev.frame()
         self.log.wait(r"^\[state\] BOOT -> MAIN_MENU", self.t(300))
         self.report["title_s"] = round(time.monotonic() - t0, 1)
         self.pid0 = self.dev.pid()
         if not self.pid0:
             raise Failure("the game process is not running")
-        # The splash stays up until the title's first frame is drawn.
+        # The splash stays on screen until the title's first frame is drawn.
+        splash = self.dev.frame()
         end = time.monotonic() + self.t(30)
-        while time.monotonic() < end and frame_diff(first, self.dev.frame(), 0, 0) < 3.0:
+        while time.monotonic() < end and frame_diff(splash, self.dev.frame(), 0, 0) < 3.0:
             time.sleep(1.0)
         self.shot("title")
         return f"title screen after {self.report['title_s']}s; {m.group(6)}; window {int(win[0])}x{int(win[1])}"
@@ -328,7 +329,7 @@ class Run:
         _, i = self.log.wait(r"^\[state\] LOADING -> PLAYING", self.t(600), i)
         self.report["world_load_s"] = round(time.monotonic() - t0, 1)
         self.log.wait(r"^\[state\] PLAYING -> TUTORIAL", self.t(120), i)
-        time.sleep(self.t(4))
+        time.sleep(4)
         self.shot("tutorial")
         return f"tap on Start mining; playing after {self.report['world_load_s']}s; the first tip is shown"
 
@@ -336,7 +337,7 @@ class Run:
         mark = self.log.mark()
         self.tap("skip_tips")
         self.log.wait(r"^\[state\] TUTORIAL -> PLAYING", self.t(30), mark)
-        time.sleep(self.t(3))
+        time.sleep(3)
         self.shot("playing")
         return "tap on Skip tips closed the tutorial"
 
@@ -346,7 +347,7 @@ class Run:
         # change on their own.
         region = (int(260 * self.scale[1]), int(330 * self.scale[1]), int(120 * self.scale[0]))
         still_a = self.dev.frame()
-        time.sleep(self.t(3))
+        time.sleep(3)
         still_b = self.dev.frame()
         idle = frame_diff(still_a, still_b, *region)
         w, h = still_b[0:2]
@@ -369,7 +370,7 @@ class Run:
         mark = self.log.mark()
         self.tap("pause")
         _, i = self.log.wait(r"^\[state\] PLAYING -> PAUSED", self.t(20), mark)
-        time.sleep(self.t(2))
+        time.sleep(2)
         self.shot("paused")
         self.tap("resume")
         self.log.wait(r"^\[state\] PAUSED -> PLAYING", self.t(20), i)
@@ -379,7 +380,7 @@ class Run:
         mark = self.log.mark()
         self.dev.key("KEYCODE_BACK")
         _, i = self.log.wait(r"^\[state\] PLAYING -> PAUSED", self.t(20), mark)
-        time.sleep(self.t(1))
+        time.sleep(1)
         self.dev.key("KEYCODE_BACK")
         self.log.wait(r"^\[state\] PAUSED -> PLAYING", self.t(20), i)
         return "Back pauses, Back again resumes"
@@ -407,9 +408,9 @@ class Run:
         mark = self.log.mark()
         self.dev.key("KEYCODE_HOME")
         self.log.wait(r"^\[save\] written", self.t(30), mark)
-        time.sleep(self.t(5))
+        time.sleep(5)
         self.dev.shell(f"am start -W -n {self.component}", timeout=self.t(60))
-        time.sleep(self.t(6))
+        time.sleep(6)
         pid = self.dev.pid()
         if pid != self.pid0:
             raise Failure(f"the game restarted instead of resuming (pid {self.pid0} -> {pid or 'none'})")
@@ -417,7 +418,7 @@ class Run:
         return "saved when sent to the background, resumed in the same process"
 
     def stability(self) -> str:
-        time.sleep(self.t(15))
+        time.sleep(15)
         pid = self.dev.pid()
         if pid != self.pid0:
             raise Failure(f"the game process is gone (pid {self.pid0} -> {pid or 'none'})")
@@ -512,7 +513,8 @@ def main() -> int:
     ap.add_argument("--adb", default="", help="adb binary (default: <sdk>/platform-tools/adb)")
     ap.add_argument("--serial", default="emulator-5554")
     ap.add_argument("--out", default="build/device")
-    ap.add_argument("--slow", type=float, default=1.0, help="multiply every timeout (slow devices)")
+    ap.add_argument("--slow", type=float, default=1.0,
+                    help="multiply every wait limit (software-rendered emulators draw a frame every few seconds)")
     ap.add_argument("--label", default="", help="name of this run in the report (e.g. the build variant)")
     ap.add_argument("--expect-driver", default="", help="fail unless the game renders with this driver (vulkan, opengl3)")
     args = ap.parse_args()

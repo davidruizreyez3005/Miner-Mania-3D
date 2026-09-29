@@ -9,10 +9,7 @@ signing) except that it builds for x86_64 and is not runnable, so the test
 build carries the same game content natively (tools/apk/compare_content.py
 proves it). CI only - the file is not committed with this preset.
 
-    python tools/apk/add_emulator_preset.py [--name NAME] [--extra-include PATTERN] [export_presets.cfg]
-
---extra-include adds a pattern to the copy's include filter (e.g. an
-override.cfg for an experiment build); the default copy adds nothing.
+    python tools/apk/add_emulator_preset.py [export_presets.cfg]
 """
 from __future__ import annotations
 
@@ -41,10 +38,8 @@ def sections(text: str) -> list:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("path", nargs="?", default="export_presets.cfg")
-    ap.add_argument("--name", default=NAME)
-    ap.add_argument("--extra-include", default="")
     args = ap.parse_args()
-    name = args.name
+    name = NAME
     path = Path(args.path)
     secs = sections(path.read_text(encoding="utf-8"))
     presets: dict = {}
@@ -64,12 +59,6 @@ def main() -> int:
     main = re.sub(r'(?m)^name=".*"$', f'name="{name}"', main)
     main = re.sub(r"(?m)^runnable=true$", "runnable=false", main)
     main = re.sub(r'(?m)^export_path=".*"$', 'export_path="build/MinerMania3D-x86_64-emulator.apk"', main)
-    if args.extra_include:
-        main, n = re.subn(r'(?m)^include_filter="(.*)"$',
-                          lambda m: f'include_filter="{m.group(1)}{", " if m.group(1) else ""}{args.extra_include}"', main)
-        if n != 1:
-            print("error: include_filter not found in the preset", file=sys.stderr)
-            return 1
     opts = presets[src]["options"]
     for abi, on in (("armeabi-v7a", False), ("arm64-v8a", False), ("x86", False), ("x86_64", True)):
         opts, n = re.subn(rf"(?m)^architectures/{re.escape(abi)}=(true|false)$",
