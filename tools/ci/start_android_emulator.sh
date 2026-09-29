@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
 # Create a phone-sized AVD (720x1280, xhdpi, portrait - the game's design
 # resolution) on the API 35 image from install_android_emulator.sh, boot it
-# headless with KVM and SwiftShader graphics, and prepare it for automated
+# headless with KVM and software graphics, and prepare it for automated
 # input: animations off, the immersive-mode hint already acknowledged, screen
 # kept on and unlocked.
 #
-#   tools/ci/start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s]
+#   tools/ci/start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [graphics]
 #
+# graphics: lavapipe (default; Mesa's software Vulkan), swiftshader, or
+# no-vulkan (SwiftShader GLES only - apps fall back to OpenGL ES).
 # Needs /dev/kvm (hardware acceleration). Prints the device serial.
 set -euo pipefail
 
-sdk="${1:?usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s]}"
-logs="${2:?usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s]}"
+usage="usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s] [lavapipe|swiftshader|no-vulkan]"
+sdk="${1:?$usage}"
+logs="${2:?$usage}"
 timeout_s="${3:-600}"
+graphics="${4:-lavapipe}"
+case "$graphics" in
+  lavapipe) gpu_mode="lavapipe"; gpu_args=(-gpu lavapipe) ;;
+  swiftshader) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect) ;;
+  no-vulkan) gpu_mode="swiftshader_indirect"; gpu_args=(-gpu swiftshader_indirect -feature -Vulkan) ;;
+  *) echo "$usage" >&2; exit 2 ;;
+esac
 avd_name="mm3d_api35"
 serial="emulator-5554"
 adb="$sdk/platform-tools/adb"
@@ -46,7 +56,7 @@ hw.lcd.height=1280
 hw.lcd.density=320
 hw.initialOrientation=portrait
 hw.gpu.enabled=yes
-hw.gpu.mode=swiftshader_indirect
+hw.gpu.mode=$gpu_mode
 hw.keyboard=yes
 hw.mainKeys=no
 hw.audioInput=no
@@ -62,7 +72,7 @@ fastboot.forceColdBoot=yes
 EOF
 
 nohup "$sdk/emulator/emulator" -avd "$avd_name" -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics \
-  -wipe-data -gpu swiftshader_indirect -accel on -port 5554 >"$logs/emulator.log" 2>&1 &
+  -wipe-data "${gpu_args[@]}" -accel on -port 5554 >"$logs/emulator.log" 2>&1 &
 echo $! > "$logs/emulator.pid"
 
 "$adb" start-server >/dev/null 2>&1 || true
@@ -99,5 +109,7 @@ sh_ wm dismiss-keyguard >/dev/null 2>&1 || sh_ input keyevent 82
   echo "native bridge: $(sh_ getprop ro.dalvik.vm.native.bridge | tr -d '\r')"
   echo "screen: $(sh_ wm size | tr -d '\r'), $(sh_ wm density | tr -d '\r')"
   echo "opengles: $(sh_ getprop ro.opengles.version | tr -d '\r')"
+  echo "graphics: $graphics (${gpu_args[*]})"
+  echo "vulkan features: $(sh_ pm list features | grep -i vulkan | tr -d '\r' | tr '\n' ' ')"
 } | tee "$logs/device.txt" >&2
 echo "$serial"

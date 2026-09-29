@@ -285,6 +285,9 @@ class Run:
         self.report["window"] = [int(win[0]), int(win[1])]
         self.report["view"] = list(self.view)
         self.report["renderer"] = m.group(6)
+        driver = m.group(6).split(" ")[0].split("/")[-1]
+        if self.args.expect_driver and driver != self.args.expect_driver:
+            raise Failure(f"the game runs on {driver}, expected {self.args.expect_driver}: {m.group(6)}")
         self.log.wait(r"^\[state\] BOOT -> MAIN_MENU", self.t(300))
         self.report["title_s"] = round(time.monotonic() - t0, 1)
         self.pid0 = self.dev.pid()
@@ -473,6 +476,7 @@ def main() -> int:
     ap.add_argument("--out", default="build/device")
     ap.add_argument("--slow", type=float, default=1.0, help="multiply every timeout (slow devices)")
     ap.add_argument("--label", default="", help="name of this run in the report (e.g. the build variant)")
+    ap.add_argument("--expect-driver", default="", help="fail unless the game renders with this driver (vulkan, opengl3)")
     args = ap.parse_args()
     if not args.apk.is_file():
         print(f"error: {args.apk} not found", file=sys.stderr)

@@ -160,14 +160,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: shipped arm64-v8a APK
-            key: arm64
+          - name: shipped arm64-v8a APK, Vulkan
+            key: arm64-vulkan
             artifact: MinerMania3D-debug-apk
             apk: MinerMania3D-debug.apk
-          - name: x86_64 twin
-            key: x86_64
+            graphics: lavapipe
+            driver: vulkan
+          - name: x86_64 twin, Vulkan
+            key: x86_64-vulkan
             artifact: MinerMania3D-x86_64-emulator-apk
             apk: MinerMania3D-x86_64-emulator.apk
+            graphics: lavapipe
+            driver: vulkan
+          - name: x86_64 twin, OpenGL ES fallback
+            key: x86_64-gles
+            artifact: MinerMania3D-x86_64-emulator-apk
+            apk: MinerMania3D-x86_64-emulator.apk
+            graphics: no-vulkan
+            driver: opengl3
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -199,13 +209,13 @@ jobs:
           tools/ci/install_android_emulator.sh "$sdk"
           echo "ANDROID_SDK=$sdk" >> "$GITHUB_ENV"
 
-      - name: Boot the emulator (Android 15, 720x1280)
-        run: tools/ci/start_android_emulator.sh "$ANDROID_SDK" build/device 600
+      - name: Boot the emulator (Android 15, 720x1280, ${{ matrix.graphics }})
+        run: tools/ci/start_android_emulator.sh "$ANDROID_SDK" build/device 600 "${{ matrix.graphics }}"
 
       - name: Play the game (touch, gameplay, lifecycle)
         run: |
           python3 tools/device/device_smoke.py --apk "build/apk/${{ matrix.apk }}" --sdk "$ANDROID_SDK" \
-            --out build/device --label "${{ matrix.name }}"
+            --out build/device --label "${{ matrix.name }}" --expect-driver "${{ matrix.driver }}"
 
       - name: Summary
         if: always()
