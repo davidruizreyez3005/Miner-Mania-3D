@@ -63,7 +63,7 @@ func deepest_y() -> float:
 func pan_pixels(delta_px: Vector2) -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var k := 2.0 * dist * tan(deg_to_rad(camera.fov) * 0.5) / maxf(vp.y, 1.0)
-	var d := -delta_px * k
+	var d := -delta_px * k * float(Settings.get_value("camera_sensitivity", 1.0))
 	_pan_world(d)
 	follow = null
 
@@ -97,6 +97,9 @@ func rotate_by(deg: float) -> void:
 
 
 func release_pan(velocity_px: Vector2) -> void:
+	if bool(Settings.get_value("reduce_motion", false)):
+		pan_velocity = Vector3.ZERO
+		return
 	var vp := get_viewport().get_visible_rect().size
 	var k := 2.0 * dist * tan(deg_to_rad(camera.fov) * 0.5) / maxf(vp.y, 1.0)
 	var v := -velocity_px * k
@@ -190,7 +193,9 @@ func _process(delta: float) -> void:
 
 
 func _apply(delta: float) -> void:
-	var a := clampf(delta * EASE, 0.0, 1.0)
+	# Reduced motion: shorter, snappier camera moves.
+	var ease := EASE * (2.5 if bool(Settings.get_value("reduce_motion", false)) else 1.0)
+	var a := clampf(delta * ease, 0.0, 1.0)
 	focus = focus.lerp(target_focus, a)
 	dist = lerpf(dist, target_dist, a)
 	yaw = lerpf(yaw, deg_to_rad(target_yaw), a)

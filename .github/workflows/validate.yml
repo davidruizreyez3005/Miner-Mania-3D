@@ -54,6 +54,11 @@ jobs:
           "$GODOT" --headless --path . --script res://tools/godot/ui_smoke.gd -- \
             --report build/test-results/ui_smoke.json 2>&1 | tee build/test-results/ui_smoke.log
 
+      - name: Performance budgets (late-game mine, CPU side)
+        run: |
+          "$GODOT" --headless --path . --script res://tools/godot/perf_report.gd -- \
+            --json build/test-results/perf.json 2>&1 | tail -n 40 | tee build/test-results/perf.log
+
       - name: Balance report (6 simulated hours)
         run: |
           "$GODOT" --headless --path . --script res://tools/godot/balance_report.gd -- \

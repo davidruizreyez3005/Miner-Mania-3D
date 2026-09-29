@@ -28,7 +28,8 @@ func build() -> void:
 		content.add_child(_slider(String(k[0]), String(k[1])))
 	section("Feel")
 	content.add_child(_toggle("haptics", "Vibration"))
-	content.add_child(_toggle("reduce_motion", "Reduce camera motion"))
+	content.add_child(_toggle("reduce_motion", "Reduce motion"))
+	content.add_child(_slider("camera_sensitivity", "Camera speed", 0.5, 2.0))
 	content.add_child(_toggle("tutorial_enabled", "Show tips"))
 	section("Graphics")
 	var q := UiKit.hbox(8)
@@ -59,14 +60,14 @@ func build() -> void:
 	content.add_child(UiKit.wrap("Miner Mania 3D  v%s\nMade with Godot Engine. Every model, texture and sound in this game is generated procedurally." % String(ProjectSettings.get_setting("application/config/version", "1.0.0"))))
 
 
-func _slider(key: String, text: String) -> Control:
+func _slider(key: String, text: String, lo: float = 0.0, hi: float = 1.0) -> Control:
 	var h := UiKit.hbox(12)
 	var l := UiKit.label(text, "Small")
 	l.custom_minimum_size.x = 170
 	h.add_child(l)
 	var sl := HSlider.new()
-	sl.min_value = 0.0
-	sl.max_value = 1.0
+	sl.min_value = lo
+	sl.max_value = hi
 	sl.step = 0.05
 	sl.value = float(Settings.get_value(key, 0.8))
 	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL

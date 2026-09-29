@@ -144,6 +144,8 @@ static func clear(n: Node) -> void:
 
 ## A short pop animation for newly shown controls.
 static func pop_in(c: Control, delay: float = 0.0) -> void:
+	if bool(Settings.get_value("reduce_motion", false)):
+		return
 	c.pivot_offset = c.size * 0.5
 	c.scale = Vector2(0.92, 0.92)
 	c.modulate.a = 0.0

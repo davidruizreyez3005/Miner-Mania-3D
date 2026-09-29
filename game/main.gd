@@ -311,8 +311,19 @@ func _on_offline_report(report: Dictionary) -> void:
 
 
 func quit_to_menu() -> void:
-	Session.save_now()
 	ui.close_all()
+	# Saving is a game state of its own: the mine stands still while the
+	# save is written and verified, then the title screen opens.
+	GameState.clear_overlays()
+	GameState.request(State.SAVE)
+	while Session.offline_in_progress():
+		Session.step_offline()
+	var ok := Session.save_now()
+	EventBus.save_completed.emit(ok, "" if ok else "write failed")
+	if not ok:
+		ui.toast("Could not save - your progress is kept in memory", "bad")
+		GameState.close(State.SAVE)
+		return
 	ui.show_game(false)
 	GameState.clear_overlays()
 	GameState.request(State.MAIN_MENU)
