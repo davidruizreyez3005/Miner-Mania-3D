@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create a phone-sized AVD (720x1280, xhdpi, portrait - the game's design
-# resolution) on the API 30 image from install_android_emulator.sh, boot it
+# resolution) on the API 35 image from install_android_emulator.sh, boot it
 # headless with KVM and SwiftShader graphics, and prepare it for automated
 # input: animations off, the immersive-mode hint already acknowledged, screen
 # kept on and unlocked.
@@ -13,7 +13,7 @@ set -euo pipefail
 sdk="${1:?usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s]}"
 logs="${2:?usage: start_android_emulator.sh <sdk_dir> <log_dir> [boot_timeout_s]}"
 timeout_s="${3:-600}"
-avd_name="mm3d_api30"
+avd_name="mm3d_api35"
 serial="emulator-5554"
 adb="$sdk/platform-tools/adb"
 
@@ -31,7 +31,7 @@ cat > "$ANDROID_AVD_HOME/$avd_name.ini" <<EOF
 avd.ini.encoding=UTF-8
 path=$ANDROID_AVD_HOME/$avd_name.avd
 path.rel=avd/$avd_name.avd
-target=android-30
+target=android-35
 EOF
 cat > "$ANDROID_AVD_HOME/$avd_name.avd/config.ini" <<EOF
 AvdId=$avd_name
@@ -54,7 +54,7 @@ hw.audioOutput=no
 hw.camera.back=none
 hw.camera.front=none
 disk.dataPartition.size=6G
-image.sysdir.1=system-images/android-30/google_apis/x86_64/
+image.sysdir.1=system-images/android-35/google_apis/x86_64/
 tag.id=google_apis
 tag.display=Google APIs
 PlayStore.enabled=false

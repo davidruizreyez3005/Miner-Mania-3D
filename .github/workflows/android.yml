@@ -4,10 +4,14 @@ name: Android
 # Android APK with the pinned Godot and its checksum-verified export
 # templates, verifies it (structure, package id, version, ABI, signature,
 # packaged content, no secrets) and uploads the APK with its reports.
-# Finally the uploaded APK is installed on an Android emulator (KVM,
+# Finally the game is installed on an Android 15 emulator (KVM,
 # checksum-verified official packages) and played with real touch input:
 # title screen, new claim, tutorial, camera, pause menu, Back key, autosaves,
-# background/resume - failing on any crash, ANR or engine error.
+# background/resume - failing on any crash, ANR or engine error. Two builds
+# are played: the shipped arm64-v8a APK (through the emulator's ARM
+# translation) and its x86_64 twin (same preset, native on the emulator;
+# tools/apk/compare_content.py proves every non-native-library file of the
+# two APKs is identical).
 # The debug keystore is created fresh for every run and never stored.
 
 on:
@@ -106,6 +110,25 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+      - name: Export the x86_64 twin for the emulator (same game content)
+        run: |
+          python tools/apk/add_emulator_preset.py
+          "$GODOT" --headless --path . --export-debug "Android x86_64 (emulator test)" \
+            build/apk/MinerMania3D-x86_64-emulator.apk 2>&1 | tee build/apk/export_x86_64.log
+          git checkout -- export_presets.cfg
+          test -s build/apk/MinerMania3D-x86_64-emulator.apk
+          python tools/apk/compare_content.py build/apk/MinerMania3D-debug.apk \
+            build/apk/MinerMania3D-x86_64-emulator.apk --report build/apk/content_compare.json
+
+      - name: Upload the x86_64 twin
+        uses: actions/upload-artifact@v7
+        with:
+          name: MinerMania3D-x86_64-emulator-apk
+          path: build/apk/MinerMania3D-x86_64-emulator.apk
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
       - name: Upload APK reports and logs
         if: always()
         continue-on-error: true
@@ -115,7 +138,9 @@ jobs:
           path: |
             build/apk/apk_report.json
             build/apk/apk_manifest.json
+            build/apk/content_compare.json
             build/apk/export.log
+            build/apk/export_x86_64.log
             build/apk/verify.log
             build/godot_import.log
             assets/generated/catalog.json
@@ -124,13 +149,25 @@ jobs:
           retention-days: 30
 
   device:
-    name: Play the APK on an Android emulator
+    name: Play on an Android emulator (${{ matrix.name }})
     needs: apk
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
       actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: shipped arm64-v8a APK
+            key: arm64
+            artifact: MinerMania3D-debug-apk
+            apk: MinerMania3D-debug.apk
+          - name: x86_64 twin
+            key: x86_64
+            artifact: MinerMania3D-x86_64-emulator-apk
+            apk: MinerMania3D-x86_64-emulator.apk
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -139,9 +176,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name MinerMania3D-debug-apk --dir build/apk
-          test -s build/apk/MinerMania3D-debug.apk
-          sha256sum build/apk/MinerMania3D-debug.apk
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "${{ matrix.artifact }}" --dir build/apk
+          test -s "build/apk/${{ matrix.apk }}"
+          sha256sum "build/apk/${{ matrix.apk }}"
 
       - name: Enable KVM for the emulator
         run: |
@@ -162,11 +199,13 @@ jobs:
           tools/ci/install_android_emulator.sh "$sdk"
           echo "ANDROID_SDK=$sdk" >> "$GITHUB_ENV"
 
-      - name: Boot the emulator (API 30, 720x1280)
+      - name: Boot the emulator (Android 15, 720x1280)
         run: tools/ci/start_android_emulator.sh "$ANDROID_SDK" build/device 600
 
-      - name: Play the APK (touch, gameplay, lifecycle)
-        run: python3 tools/device/device_smoke.py --apk build/apk/MinerMania3D-debug.apk --sdk "$ANDROID_SDK" --out build/device
+      - name: Play the game (touch, gameplay, lifecycle)
+        run: |
+          python3 tools/device/device_smoke.py --apk "build/apk/${{ matrix.apk }}" --sdk "$ANDROID_SDK" \
+            --out build/device --label "${{ matrix.name }}"
 
       - name: Summary
         if: always()
@@ -174,7 +213,7 @@ jobs:
           if [[ -f build/device/device_report.md ]]; then
             cat build/device/device_report.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### On-device test: did not run (see the job log)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### On-device test (${{ matrix.name }}): did not run (see the job log)" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload device test results
@@ -182,7 +221,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: device-test
+          name: device-test-${{ matrix.key }}
           path: build/device
           if-no-files-found: warn
           retention-days: 30

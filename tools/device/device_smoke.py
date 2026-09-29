@@ -153,11 +153,13 @@ class Logcat:
             time.sleep(0.25)
 
     def problems(self) -> dict:
-        crashes, errors = [], []
+        crashes, errors, gaps = [], [], []
         with self.lock:
             lines = list(self.lines)
         for i, e in enumerate(lines):
             msg, tag = e["msg"], e["tag"]
+            if tag == "ndk_translation" and "Undefined instruction" in msg:
+                gaps.append(msg)
             if tag == "AndroidRuntime" and "FATAL EXCEPTION" in msg:
                 crashes.append(msg)
             elif tag == "libc" and "Fatal signal" in msg:
@@ -168,7 +170,7 @@ class Logcat:
             elif tag == "godot" and e["prio"] in ("E", "F") and msg.lstrip().startswith(GODOT_ERROR_PREFIXES):
                 where = lines[i + 1]["msg"].strip() if i + 1 < len(lines) and lines[i + 1]["tag"] == "godot" else ""
                 errors.append(f"{msg.strip()} {where}".strip())
-        return {"crashes": crashes, "errors": errors}
+        return {"crashes": crashes, "errors": errors, "translation_gaps": gaps}
 
     def close(self) -> None:
         self.proc.terminate()
@@ -204,7 +206,8 @@ class Run:
         self.out.mkdir(parents=True, exist_ok=True)
         self.dev = Device(args.adb or str(Path(args.sdk) / "platform-tools" / "adb"), args.serial)
         self.steps: list = []
-        self.report: dict = {"package": PACKAGE, "apk": str(args.apk), "serial": args.serial, "steps": self.steps}
+        self.report: dict = {"label": args.label, "package": PACKAGE, "apk": str(args.apk), "serial": args.serial,
+                             "steps": self.steps}
         self.log: Logcat | None = None
         self.scale = (1.0, 1.0)
         self.view = (720.0, 1280.0)
@@ -417,11 +420,15 @@ class Run:
             probs = self.log.problems()
             self.report["crashes"] = probs["crashes"]
             self.report["engine_errors"] = probs["errors"]
+            self.report["translation_gaps"] = probs["translation_gaps"]
             self.report["game_log"] = self.log.game()[-400:]
             self.log.close()
             if probs["crashes"]:
                 ok = False
                 print("CRASH: " + " | ".join(probs["crashes"][:5]), flush=True)
+            if probs["translation_gaps"]:
+                print("The emulator's ARM translation (ndk_translation) cannot execute an instruction of the "
+                      "arm64 build: " + probs["translation_gaps"][0], flush=True)
             if probs["errors"]:
                 ok = False
                 print(f"{len(probs['errors'])} engine/script errors:\n  " + "\n  ".join(probs["errors"][:20]), flush=True)
@@ -433,7 +440,8 @@ class Run:
 
     def markdown(self) -> str:
         r = self.report
-        lines = [f"### On-device test: {'PASSED' if r['passed'] else 'FAILED'}", ""]
+        title = f"On-device test ({r['label']})" if r.get("label") else "On-device test"
+        lines = [f"### {title}: {'PASSED' if r['passed'] else 'FAILED'}", ""]
         if r.get("renderer"):
             lines.append(f"- {PACKAGE} {r.get('version_name', '?')} on `{r.get('primary_abi', '?')}`, "
                          f"window {r.get('window')}, renderer {r.get('renderer')}")
@@ -447,6 +455,9 @@ class Run:
             lines.append(f"| {s['name']} | {'ok' if s['ok'] else 'FAILED'} | {s['seconds']}s | {detail} |")
         if r.get("crashes"):
             lines += ["", "**Crashes:** " + "; ".join(r["crashes"][:5])]
+        if r.get("translation_gaps"):
+            lines += ["", "**ARM translation gap:** the emulator's ndk_translation cannot execute an instruction of "
+                      "the arm64 engine binary (`" + r["translation_gaps"][0] + "`); real arm64 devices run it natively."]
         if r.get("engine_errors"):
             lines += ["", f"**Engine/script errors ({len(r['engine_errors'])}):**", ""]
             lines += [f"- `{e[:300]}`" for e in r["engine_errors"][:15]]
@@ -461,6 +472,7 @@ def main() -> int:
     ap.add_argument("--serial", default="emulator-5554")
     ap.add_argument("--out", default="build/device")
     ap.add_argument("--slow", type=float, default=1.0, help="multiply every timeout (slow devices)")
+    ap.add_argument("--label", default="", help="name of this run in the report (e.g. the build variant)")
     args = ap.parse_args()
     if not args.apk.is_file():
         print(f"error: {args.apk} not found", file=sys.stderr)

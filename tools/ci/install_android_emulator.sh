@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Install what the on-device test needs next to the SDK from
-# install_android_sdk.sh: the Android Emulator and an Android 11 (API 30)
-# x86_64 "Google APIs" system image. That image translates ARM code
-# (ro.product.cpu.abilist includes arm64-v8a), so it runs the arm64-v8a APK
-# we ship, unchanged.
+# install_android_sdk.sh: the Android Emulator and an Android 15 (API 35)
+# x86_64 "Google APIs" system image. The image runs x86_64 builds natively and
+# translates ARM code (ro.product.cpu.abilist includes arm64-v8a), so the
+# arm64-v8a APK we ship runs on it too - as far as its ndk_translation (0.2.3)
+# covers the engine's instructions; the API 30 image's 0.2.2 stopped on one.
 #
 #   tools/ci/install_android_emulator.sh <sdk_dir>
 #
@@ -17,10 +18,10 @@ BASE="https://dl.google.com/android/repository"
 EMU_ZIP="emulator-linux_x64-15917651.zip"          # emulator 37.1.11 (stable channel)
 EMU_SHA1="1b1f78891abf8ec268264356e1365c25519e8379"
 EMU_SHA256="95771e0ae431897b2a4bd2d97fa095f29a8b0624a7b216baf529f9306161c266"
-IMG_ZIP="x86_64-30_r16.zip"                          # system-images;android-30;google_apis;x86_64 r16
-IMG_SHA1="6ae21030eaadc041078444d3798e4b399f3e787d"
-IMG_SHA256="daae27654be74ae83a484daea4db2c0c77b4f4ad661a645bd5f36d96ce03e4d5"
-IMG_DIR="system-images/android-30/google_apis"
+IMG_ZIP="x86_64-35_r09.zip"                          # system-images;android-35;google_apis;x86_64 r9
+IMG_SHA1="0103e6dab21290c4b9d16550a3ce99476f884eef"
+IMG_SHA256="c67b9ba0ff5bc0eb6d046871bfa228af14d4d47b02f0cdae94f048e511b7566e"
+IMG_DIR="system-images/android-35/google_apis"
 
 sdk="${1:?usage: install_android_emulator.sh <sdk_dir>}"
 mkdir -p "$sdk"

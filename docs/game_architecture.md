@@ -217,9 +217,12 @@ boots the real game and plays it end to end, including memory checks
 leave objects behind).
 
 `tools/device/device_smoke.py` plays the exported APK on an Android device
-or emulator (CI: API 30 x86_64 image, whose ARM translation runs the arm64
-build unchanged) with real touch input through adb, following the game's
-log lines (`[boot]`, `[state] A -> B`, `[save] ...`): title, new claim,
+or emulator with real touch input through adb, following the game's log
+lines (`[boot]`, `[state] A -> B`, `[save] ...`): title, new claim,
 tutorial, camera pan (the picture must change), pause menu, Back key,
 autosaves with the claim clock advancing, background and resume in the same
-process, and no crash, ANR or engine error.
+process, and no crash, ANR or engine error. CI runs it on an Android 15
+x86_64 emulator twice: with the shipped arm64-v8a APK (through the image's
+ARM translation) and with an x86_64 twin exported from a copy of the same
+preset, which `tools/apk/compare_content.py` proves identical apart from
+the engine's native library.
