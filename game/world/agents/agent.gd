@@ -27,11 +27,11 @@ var _target_yaw := 0.0
 var rider_slot := 0
 
 
-func setup_agent(n: MineNav, asset_id: String) -> void:
+func setup_agent(n: MineNav, asset_id: String, lod: int = 0) -> void:
 	nav = n
 	rig = CharacterRig.new()
 	add_child(rig)
-	rig.setup(asset_id)
+	rig.setup(asset_id, lod)
 
 
 func place(pos: Vector3, lvl: int, face_yaw: float = 0.0) -> void:

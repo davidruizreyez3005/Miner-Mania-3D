@@ -30,16 +30,24 @@ var detail := DETAIL_FULL
 var on_screen := true
 var underground := false            # lit by the gallery lamps instead of the sun
 var always_animate := false         # the player's foreman: gameplay rides on its clip events
+var lod_level := 0                   # 0 = full model; crews use the pipeline's lighter LOD
+static var _shared_library: AnimationLibrary
 var _events: Array = []              # [[time, name]] of the current clip
 var _prev_pos := 0.0
 var _manual_acc := 0.0
 var _frame_skip := 0
 
 
-func setup(aid: String) -> void:
+## `lod`: 0 for the full model (the foreman), 1-2 for the pipeline's lighter
+## LOD models (crews at game distance). LOD models carry no clips of their
+## own; every variant shares the humanoid_worker_v1 skeleton, so they play
+## the shared clip library.
+func setup(aid: String, lod: int = 0) -> void:
 	asset_id = aid
 	name = "Rig_" + aid
-	model = Assets.instantiate(aid, "", false)
+	model = _lod_model(aid, lod)
+	if model == null:
+		model = Assets.instantiate(aid, "", false)
 	add_child(model)
 	var aps := model.find_children("*", "AnimationPlayer", true, false)
 	if not aps.is_empty():
@@ -63,6 +71,51 @@ func setup(aid: String) -> void:
 	notifier.screen_entered.connect(_on_screen_changed.bind(true))
 	notifier.screen_exited.connect(_on_screen_changed.bind(false))
 	add_child(notifier)
+
+
+func _lod_model(aid: String, lod: int) -> Node3D:
+	if lod <= 0:
+		return null
+	var path := ""
+	for l in Assets.info(aid).get("lods", []):
+		if int(l.get("level", 0)) == lod:
+			path = String(l.get("model", ""))
+	var lib := shared_library()
+	if path == "" or lib == null or not ResourceLoader.exists(path):
+		return null
+	var ps := Assets.scene(path)
+	if ps == null:
+		return null
+	var root := Node3D.new()
+	root.name = aid
+	root.set_meta("asset_id", aid)
+	var inst := ps.instantiate() as Node3D
+	inst.name = "LOD%d" % lod
+	root.add_child(inst)
+	var ap := AnimationPlayer.new()
+	ap.name = "AnimationPlayer"
+	inst.add_child(ap)
+	ap.root_node = NodePath("..")
+	ap.add_animation_library("", lib)
+	lod_level = lod
+	return root
+
+
+## The clip library every worker variant shares (from the animation
+## library model), loaded once.
+static func shared_library() -> AnimationLibrary:
+	if _shared_library == null:
+		var path := String(Assets.humanoid.get("library_model", ""))
+		var ps := Assets.scene(path) if path != "" and ResourceLoader.exists(path) else null
+		if ps == null:
+			return null
+		var inst := ps.instantiate()
+		for ap in inst.find_children("*", "AnimationPlayer", true, false):
+			var a := ap as AnimationPlayer
+			if a.has_animation_library(""):
+				_shared_library = a.get_animation_library("")
+		inst.free()
+	return _shared_library
 
 
 func has_clip(c: String) -> bool:

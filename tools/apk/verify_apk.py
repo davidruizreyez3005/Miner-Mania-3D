@@ -142,6 +142,10 @@ def main() -> int:
     used = sorted(export_filter.referenced())
     missing_models = [aid for aid in used if not any(n.startswith("assets/.godot/imported/%s.glb-" % aid) for n in imported)]
     check(not missing_models, "a model for all %d assets the game uses%s" % (len(used), "" if not missing_models else " (missing %s)" % missing_models))
+    # Every model's textures (Godot names extracted textures <model>_<image>).
+    textures = [n.rsplit("/", 1)[-1] for n in imported if n.endswith(".ctex")]
+    untextured = [aid for aid in used if not any(t.startswith(aid + "_") for t in textures)]
+    check(not untextured, "textures packaged for every used model%s" % ("" if not untextured else " (missing for %d: %s)" % (len(untextured), ", ".join(untextured[:6]))))
     audio = [n for n in imported if ".wav-" in n]
     check(len(audio) >= 20, "sound effects packaged (%d)" % len(audio))
     info["counts"] = {"files": len(names), "imported": len(imported), "models": len([n for n in imported if n.endswith(".scn")]),

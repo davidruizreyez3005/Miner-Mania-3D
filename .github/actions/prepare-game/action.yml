@@ -88,6 +88,9 @@ runs:
         python tools/textures/texgen.py
         python tools/assets/build_catalog.py --check
 
+    # Everything Godot derives from the models: the import records, the
+    # imported data, and the textures it extracts from each model on first
+    # import (the models reference them - without them exports lose textures).
     - name: Restore the Godot import cache
       uses: actions/cache@v6
       with:
@@ -95,7 +98,9 @@ runs:
           .godot/imported
           .godot/uid_cache.bin
           assets/generated/**/*.import
-        key: godot-import-v1-${{ steps.assets.outputs.cache-primary-key }}-${{ hashFiles('project.godot', 'godot/pipeline/**', 'tools/assets/tune_imports.py', 'tools/audio/synth.py', 'tools/textures/texgen.py') }}
+          assets/generated/**/*.jpg
+          assets/generated/**/*.png
+        key: godot-import-v2-${{ steps.assets.outputs.cache-primary-key }}-${{ hashFiles('project.godot', 'godot/pipeline/**', 'tools/assets/tune_imports.py', 'tools/audio/synth.py', 'tools/textures/texgen.py') }}
 
     - name: Godot import (mobile texture settings)
       shell: bash

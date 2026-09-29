@@ -11,6 +11,7 @@ extends Agent
 ## rest (bench or ground) and idle.
 
 const HAUL_PROPS := ["prop_ore_sack_01", "prop_crate_carry_01"]
+const CREW_LOD := 2                  # ~5k-triangle crew models (the foreman keeps the full one)
 
 var mgr: AgentManager
 var wid := 0
@@ -34,7 +35,7 @@ func setup_worker(m: AgentManager, w: Dictionary) -> void:
 	var aid := String(w.get("variant", ""))
 	if not Assets.has(aid):
 		aid = "chr_worker_%s_01" % role
-	setup_agent(m.nav, aid)
+	setup_agent(m.nav, aid, CREW_LOD)
 	rider_slot = wid % 6
 	_variety = 0.92 + 0.16 * float((wid * 37) % 11) / 10.0
 	arrived.connect(_on_arrived)
