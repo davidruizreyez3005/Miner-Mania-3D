@@ -156,6 +156,80 @@ func test_foreman_mines_through_the_simulation() -> void:
 	assert_gt(float(w.sim.state.run_stats.get("manual_swings", 0.0)), before, "the foreman's swings reach the simulation")
 
 
+func test_foreman_queues_taps_on_the_way() -> void:
+	var w := _world_full()
+	var f := w.agents.foreman
+	# Start at the shaft landing of depth 1, clear of the veins.
+	var start := w.agents.nav.landing(1) + Vector3(2.2, 0, 0.6)
+	start.y = w.agents.nav.floor_y(1, start.x, start.z)
+	f.walk_to(1, start)
+	f.place(start, 1)
+	f.rig.play("Idle")
+	# A full vein and room at the station (the crews share this world).
+	var dep := w.sim.state.depth(1)
+	for n in dep["nodes"]:
+		if int(n["slot"]) == 0:
+			n["hp"] = n["max_hp"]
+			n["respawn_at"] = -1.0
+	var attempts := [0]
+	f.swung.connect(func(_r: Dictionary) -> void: attempts[0] += 1)
+	var before := float(w.sim.state.run_stats.get("manual_swings", 0.0))
+	# Five taps while he runs to the vein: five swings when he gets there.
+	for k in 5:
+		f.mine(1, 0)
+		for i in 3:
+			w.sync(1.0 / 30.0)
+	assert_true(f.moving, "the foreman is on his way")
+	for i in 1200:
+		(dep["station"] as Dictionary).clear()
+		w.sync(1.0 / 30.0)
+		if f.rig.anim:
+			f.rig.anim.advance(1.0 / 30.0)
+		f.rig._check_events()
+	assert_eq(attempts[0], 5, "every tap on the way became a swing")
+	assert_eq(float(w.sim.state.run_stats.get("manual_swings", 0.0)) - before, 5.0, "and each one mined")
+
+
+func test_camera_drags_follow_the_finger() -> void:
+	var w := _world_full()
+	var rig := CameraRig.new()
+	w.add_child(rig)
+	rig.setup(w)
+	assert_false(rig.has_method("rotate_by"), "the camera has no rotation")
+	# Surface: a finger moving up the screen brings the cut edge (+z) closer.
+	rig.focus_on(Vector3(4, 0, -20), 30.0)
+	var z0 := rig.target_focus.z
+	rig.pan_pixels(Vector2(0, -80))
+	assert_gt(rig.target_focus.z, z0, "surface: drag up moves toward the cut edge")
+	var x0 := rig.target_focus.x
+	rig.pan_pixels(Vector2(-80, 0))
+	assert_gt(rig.target_focus.x, x0, "surface: drag left moves the view right")
+	# Underground: up the screen goes deeper, down comes back up.
+	rig.focus_target("depth:3")
+	var y0 := rig.target_focus.y
+	rig.pan_pixels(Vector2(0, -80))
+	assert_lt(rig.target_focus.y, y0, "underground: drag up goes deeper")
+	y0 = rig.target_focus.y
+	rig.pan_pixels(Vector2(0, 160))
+	assert_gt(rig.target_focus.y, y0, "underground: drag down comes up")
+	# One continuous drag up from the camp flows over the edge into the mine,
+	# and down again back out of it.
+	rig.focus_on(Vector3(4, 0, -6), 30.0)
+	for k in 30:
+		rig.pan_pixels(Vector2(0, -40))
+	assert_lt(rig.target_focus.y, -1.0, "dragging up over the edge descends")
+	for k in 60:
+		rig.pan_pixels(Vector2(0, 40))
+	assert_eq(rig.target_focus.y, 0.0, "dragging down climbs back to the camp")
+	assert_lt(rig.target_focus.z, CameraRig.FRONT_Z, "and on into the camp")
+	# The view never turns.
+	for i in 30:
+		rig._process(1.0 / 30.0)
+	var fwd := -rig.camera.global_transform.basis.z
+	assert_near(fwd.x, 0.0, 1e-4, "camera faces straight into the hills")
+	rig.queue_free()
+
+
 func _triangles(root: Node, budget_nodes: Array) -> int:
 	var tri := 0
 	for n in root.find_children("*", "GeometryInstance3D", true, false):

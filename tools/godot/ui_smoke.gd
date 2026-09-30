@@ -1,9 +1,12 @@
 extends SceneTree
 ## Runtime smoke test of the real game: boots main.tscn, waits for the title
-## screen, starts a new claim, plays (taps veins, winds the lift, sells),
-## opens every panel and popup, pauses, quits to the title - failing on any
-## script/engine error or a missed state transition. With a display it also
-## saves screenshots of every step (SHOTDIR env or --shots <dir>).
+## screen, starts a new claim, plays every first-session tip with touch
+## events (Next, taps on the vein, LIFT, SELL, the controls the tips point
+## at), plays on (taps veins, winds the lift, sells), opens every panel and
+## popup, scrolls a menu and moves the camera by touch, pauses, quits to the
+## title - failing on any script/engine error, a tip that does not advance
+## or a missed state transition. With a display it also saves screenshots
+## of every step (SHOTDIR env or --shots <dir>).
 ##
 ##   godot --headless --path . --script res://tools/godot/ui_smoke.gd -- [--shots <dir>] [--report <path>]
 
@@ -14,11 +17,15 @@ const PANELS := [["depth", {"depth": 1}], ["facility", {"facility": "headframe"}
 
 
 class Capture extends Logger:
-	## The headless dummy renderer keeps no GPU data; its material storage can
-	## report a race between a freed material and a pending instance update
-	## that the real renderers (Vulkan, GLES3 runs of this same test) never
-	## show. That one message is reported as a warning, never dropped.
-	const HEADLESS_ONLY := ["servers/rendering/dummy/storage/material_storage.cpp"]
+	## The headless dummy renderer keeps no GPU data, and its storage is not
+	## thread-safe: its material storage can report a race between a freed
+	## material and a pending instance update, and its texture storage a
+	## texture created while models load on worker threads. The real
+	## renderers (Vulkan, GLES3 - thread-safe storage; runs of this same test
+	## and the device test) never show them. These messages are reported as
+	## warnings, never dropped.
+	const HEADLESS_ONLY := ["servers/rendering/dummy/storage/material_storage.cpp",
+		"servers/rendering/dummy/storage/texture_storage.h"]
 	var errors: Array = []
 	var warnings: Array = []
 	var mutex := Mutex.new()
@@ -31,7 +38,7 @@ class Capture extends Logger:
 		var msg := "%s %s:%d %s %s%s" % ["SCRIPT ERROR" if error_type == ERROR_TYPE_SCRIPT else "ERROR", file, line, function,
 			rationale if rationale != "" else code, bt]
 		mutex.lock()
-		if file in HEADLESS_ONLY and DisplayServer.get_name() == "headless":
+		if file.trim_prefix("./") in HEADLESS_ONLY and DisplayServer.get_name() == "headless":
 			warnings.append(msg)
 		else:
 			errors.append(msg)
@@ -142,6 +149,7 @@ func _run() -> void:
 		if _state() != GS.TUTORIAL:
 			failures.append("the tutorial did not come back after the pause menu: %s" % GameStateMachine.name_of(_state()))
 	var sim: Simulation = root.get_node("Session").sim
+	await _tips_by_touch(sim)
 	# Play: swing at a vein until ore piles up, wind the lift, sell.
 	main._on_tap("node:1:0", Vector3.ZERO, -1, Vector3.ZERO)
 	var foreman = main.world_ref().agents.foreman
@@ -176,6 +184,8 @@ func _run() -> void:
 		i += 1
 		if _state() != GS.PLAYING and not root.get_node("GameState").has(GS.TUTORIAL):
 			failures.append("state not restored after closing %s: %s" % [p[0], GameStateMachine.name_of(_state())])
+	await _scroll_by_touch(ui)
+	await _camera_by_touch()
 	# Memory: opening and closing every panel again and again must not leave
 	# objects or orphan nodes behind (the first pass warms the caches).
 	var counts: Array = []
@@ -231,3 +241,206 @@ func _run() -> void:
 	if int(at_title[1][0]) - int(at_title[0][0]) > 150 or int(at_title[1][1]) > int(at_title[0][1]):
 		failures.append("the previous world stays in memory after leaving it: %s" % str(at_title))
 	log_lines.append("continue_and_quit_twice")
+
+
+# ------------------------------------------------------------ touch helpers
+
+## Touch events in viewport coordinates (converted to window coordinates, as
+## a phone's screen would send them; the engine turns the first finger into
+## mouse events for the UI).
+func _touch(index: int, p: Vector2, down: bool) -> void:
+	var e := InputEventScreenTouch.new()
+	e.index = index
+	e.position = root.get_final_transform() * p
+	e.pressed = down
+	Input.parse_input_event(e)
+
+
+func _drag_touch(index: int, p: Vector2, rel: Vector2) -> void:
+	var xf := root.get_final_transform()
+	var e := InputEventScreenDrag.new()
+	e.index = index
+	e.position = xf * p
+	e.relative = xf.basis_xform(rel)
+	e.velocity = xf.basis_xform(rel * 30.0)
+	Input.parse_input_event(e)
+
+
+func _tap(p: Vector2) -> void:
+	_touch(0, p, true)
+	await _frames(2)
+	_touch(0, p, false)
+	await _frames(2)
+
+
+## A one-finger swipe from `a` by `by` in `steps` moves.
+func _swipe(a: Vector2, by: Vector2, steps: int = 12) -> void:
+	_touch(0, a, true)
+	await _frames(2)
+	for k in steps:
+		_drag_touch(0, a + by * float(k + 1) / float(steps), by / float(steps))
+		await _frames(1)
+	_touch(0, a + by, false)
+	await _frames(2)
+
+
+func _tip() -> int:
+	var s = root.get_node("Session").sim
+	return int(s.state.meta.get("tutorial_step", 0)) if s != null else -1
+
+
+## Waits (up to `frames`) for the tutorial to move past tip `idx`.
+func _tip_passed(idx: int, frames: int) -> bool:
+	for i in frames:
+		if _tip() > idx:
+			return true
+		await process_frame
+	return _tip() > idx
+
+
+## Plays every first-session tip as a player would: taps land where the
+## card's buttons and the tip's marker are.
+func _tips_by_touch(sim: Simulation) -> void:
+	var ids := []
+	for st in main.ui.tutorial.steps():
+		ids.append(String(st.get("id", "")))
+	if ids != ["welcome", "mine", "lift", "sell", "hire", "upgrade", "quests", "done"]:
+		failures.append("tips changed (%s): update the touch walkthrough" % str(ids))
+		return
+	for idx in ids.size():
+		if _tip() != idx:
+			failures.append("tip %d (%s) expected, on tip %d" % [idx, ids[idx], _tip()])
+			return
+		if not main.ui.tutorial.card.visible and main.ui.stack.is_empty():
+			failures.append("tip %d (%s) is not showing" % [idx, ids[idx]])
+		await _play_tip(idx)
+		if not await _tip_passed(idx, 900):
+			failures.append("tip %d (%s) did not advance after its action (swings %s, money %.0f, panels %s)" % [idx, ids[idx],
+				str(sim.state.run_stats.get("manual_swings", 0)), sim.state.money, str(main.ui.stack.map(func(p): return p.panel_id()))])
+			return
+	await _frames(10)
+	if not bool(sim.state.meta.get("tutorial_done", false)) or root.get_node("GameState").has(GameStateMachine.State.TUTORIAL):
+		failures.append("the tutorial did not finish")
+	log_lines.append("tips_by_touch")
+
+
+func _play_tip(idx: int) -> void:
+	var tut = main.ui.tutorial
+	var hud = main.ui.hud
+	match idx:
+		0:
+			await _tap(tut.next_button.get_global_rect().get_center())
+		1:
+			# Tap the vein again and again (taps on the way queue swings).
+			for k in 8:
+				if _tip() > 1:
+					return
+				await _tap(tut.step_anchor_pos(1))
+				await _frames(20)
+		2:
+			await _tap((hud.buttons["lift"] as Control).get_global_rect().get_center())
+		3:
+			await _tap((hud.buttons["sell"] as Control).get_global_rect().get_center())
+		4, 5:
+			# Where the marker points: the gallery (opens its panel), then
+			# the button in the panel.
+			for k in 3:
+				if _tip() > idx:
+					return
+				await _tap(tut.step_anchor_pos(idx))
+				await _frames(30)
+		6:
+			main.ui.close_all()
+			await _frames(20)
+			await _tap(tut.step_anchor_pos(6))
+			await _frames(20)
+		7:
+			main.ui.close_all()
+			await _frames(20)
+			await _tap(tut.next_button.get_global_rect().get_center())
+
+
+## Menus scroll with a finger dragged over their buttons and cards, and a
+## tap on a list button still presses it.
+func _scroll_by_touch(ui) -> void:
+	ui.close_all()
+	await _frames(10)
+	var techs := _sim().state.techs.size()
+	var p = ui.open_panel("research", {})
+	await _frames(20)
+	if p == null or p.scroll == null:
+		failures.append("research panel did not open")
+		return
+	var view: Rect2 = p.scroll.get_global_rect()
+	if p.content.size.y <= view.size.y + 50.0:
+		failures.append("research list too short to test scrolling")
+	var start := Vector2(view.get_center().x, view.position.y + view.size.y * 0.8)
+	await _swipe(start, Vector2(0, -view.size.y * 0.5))
+	await _frames(20)
+	if p.scroll.scroll_vertical < 40:
+		failures.append("a finger drag over the research list did not scroll it (%d px)" % p.scroll.scroll_vertical)
+	if _sim().state.techs.size() != techs or ui.top_panel() != p:
+		failures.append("the scroll drag pressed a button")
+	ui.close_all()
+	await _frames(10)
+	var more = ui.open_panel("more", {})
+	await _frames(20)
+	var first: Button = null
+	for b in more.content.find_children("*", "Button", true, false):
+		first = b
+		break
+	if first == null:
+		failures.append("no button in the More panel")
+	else:
+		await _tap(first.get_global_rect().get_center())
+		await _frames(10)
+		if ui.top_panel() == more:
+			failures.append("a tap on a list button did not press it")
+	ui.close_all()
+	await _frames(10)
+	log_lines.append("menus_scroll_by_touch")
+
+
+func _sim() -> Simulation:
+	return root.get_node("Session").sim
+
+
+## Drags move the view with the finger (up the screen: toward the cut edge
+## on the surface, deeper underground; down: back up) and two fingers never
+## turn it.
+func _camera_by_touch() -> void:
+	var rig = main.camera_rig()
+	var vp := root.get_visible_rect().size
+	var mid := Vector2(vp.x * 0.45, vp.y * 0.45)
+	rig.focus_target("surface")
+	await _frames(90)
+	var before: Vector3 = rig.target_focus
+	await _swipe(mid, Vector2(0, -vp.y * 0.12))
+	await _frames(5)
+	if rig.target_focus.z <= before.z + 0.5:
+		failures.append("surface: dragging up did not move the view toward the cut edge (z %.2f -> %.2f)" % [before.z, rig.target_focus.z])
+	# Underground (only depth 1 is open: the view can only go up from there).
+	rig.focus_target("depth:1")
+	await _frames(90)
+	before = rig.target_focus
+	await _swipe(mid, Vector2(0, vp.y * 0.12))
+	await _frames(5)
+	if rig.target_focus.y <= before.y + 0.5:
+		failures.append("underground: dragging down did not move the view up (y %.2f -> %.2f)" % [before.y, rig.target_focus.y])
+	# Two-finger twist: the fingers turn around their midpoint.
+	var c := Vector2(vp.x * 0.45, vp.y * 0.42)
+	_touch(0, c + Vector2(-120, 0), true)
+	_touch(1, c + Vector2(120, 0), true)
+	await _frames(2)
+	for k in 12:
+		var ang := deg_to_rad(6.0 * float(k + 1))
+		_drag_touch(0, c - Vector2(cos(ang), sin(ang)) * 120.0, Vector2.ZERO)
+		_drag_touch(1, c + Vector2(cos(ang), sin(ang)) * 120.0, Vector2.ZERO)
+		await _frames(1)
+	_touch(0, c, false)
+	_touch(1, c, false)
+	await _frames(40)
+	var fwd: Vector3 = -rig.camera.global_transform.basis.z
+	if absf(fwd.x) > 0.01:
+		failures.append("a two-finger twist turned the camera (forward %s)" % str(fwd))
+	log_lines.append("camera_by_touch")

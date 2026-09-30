@@ -92,6 +92,8 @@ func build() -> void:
 		v.add_child(row)
 		content.add_child(UiKit.card(v))
 		_eq[kind] = {"level": lv, "stat": st, "buttons": bs}
+		if kind == "mining":
+			anchor("depth_upgrade", bs[0])
 	var tv := UiKit.vbox(6)
 	_tool_label = UiKit.wrap("", "Small")
 	tv.add_child(_tool_label)
@@ -118,6 +120,7 @@ func build() -> void:
 			v2.add_child(UiKit.button("%s  (Lv %d)" % [String(w["name"]), int(w["level"])], func() -> void: open("worker", {"worker": wid}), "Chip", 60))
 		content.add_child(UiKit.card(v2))
 		_hire[role] = {"label": l, "button": hb, "name": String(r.get("plural", role))}
+		anchor("depth_hire_%s" % role, hb)
 	section("Veins")
 	_veins = UiKit.vbox(8)
 	content.add_child(_veins)

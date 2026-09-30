@@ -78,6 +78,17 @@ static func _track_income(sim: Simulation, earned: float, dt: float) -> void:
 	sim.rt["income_per_s"] = sum / span
 
 
+## Goods to sell: in the warehouse, or on their way to it (at the headframe
+## bin or in the cage while it winds). A truck sent early sells them as they
+## arrive during its trip.
+static func goods_coming(sim: Simulation) -> bool:
+	var s := sim.state
+	if Simulation.inv_total(s.warehouse) > 0.01 or Simulation.inv_total(s.surface_bin) > 0.01:
+		return true
+	var lift_running := TransportSystem.lift_automatic(sim) or float(s.lift.get("manual_s", 0.0)) > 0.0
+	return lift_running and TransportSystem.stations_total(sim) > 0.01
+
+
 static func dispatch(sim: Simulation) -> Dictionary:
 	if automatic(sim):
 		return {"ok": true, "auto": true}
@@ -86,7 +97,7 @@ static func dispatch(sim: Simulation) -> Dictionary:
 	var cur := float(sim.state.sales.get("manual_s", 0.0))
 	if cur >= max_s - 0.01:
 		return {"ok": false, "error": "trucks_busy"}
-	if Simulation.inv_total(sim.state.warehouse) <= 0.01:
+	if not goods_coming(sim):
 		return {"ok": false, "error": "warehouse_empty"}
 	sim.state.sales["manual_s"] = minf(max_s, cur + float(ts["trip_s"]))
 	sim.emit("sales_dispatched", {"trip_s": ts["trip_s"]})

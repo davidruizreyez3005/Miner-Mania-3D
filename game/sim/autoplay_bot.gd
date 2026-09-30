@@ -59,8 +59,9 @@ func _track() -> void:
 
 
 func _manual_taps(dt: float) -> void:
-	## Taps only while mining is still manual at depth 1 (like a real player early on).
-	if not sim.workers_at("depth:1", "miner").is_empty():
+	## Taps while depth 1 has fewer than two miners (like a real player early
+	## on: the first miner alone digs slower than a tapping finger).
+	if sim.workers_at("depth:1", "miner").size() >= 2:
 		return
 	_tap_acc += tap_rate * dt
 	while _tap_acc >= 1.0:

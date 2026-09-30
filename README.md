@@ -29,8 +29,8 @@ is built, tested and exported to an APK by GitHub Actions.
   upgrades and four regions, outfits.
 - **Idle for real**: offline progress is simulated on load (capped and
   guarded against clock tricks) and reported in "WHILE YOU WERE AWAY".
-- **Mobile-first**: portrait touch controls (pan, pinch, twist, tap to
-  mine), progressive disclosure UI, tutorial coaching, VRAM-compressed
+- **Mobile-first**: portrait touch controls (drag to pan, pinch to zoom,
+  tap to mine), progressive disclosure UI, tutorial coaching, VRAM-compressed
   textures, crew LOD models, animation detail by distance, atomic saves with
   backup and corruption recovery.
 
@@ -75,8 +75,8 @@ python tools/apk/verify_apk.py build/MinerMania3D-debug.apk --sdk "$ANDROID_HOME
 python tools/device/device_smoke.py --apk build/MinerMania3D-debug.apk --sdk "$ANDROID_HOME" --serial <serial>
 ```
 
-Run the game on desktop with `godot --path .` (mouse emulates touch; WASD,
-Q/E and +/- move the camera).
+Run the game on desktop with `godot --path .` (mouse emulates touch; WASD /
+arrows and +/- move the camera).
 
 ## Continuous integration
 

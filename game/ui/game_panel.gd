@@ -12,6 +12,8 @@ var ui: UiRoot
 var args: Dictionary = {}
 var content: VBoxContainer
 var frame: Control
+var scroll: ScrollContainer
+var anchors: Dictionary = {}          # name -> Control that tutorial tips point at ("panel:<name>")
 var _sig := ""
 var _t := 0.0
 
@@ -56,8 +58,14 @@ func refresh() -> void:
 
 func rebuild() -> void:
 	UiKit.clear(content)
+	anchors.clear()
 	build()
 	refresh()
+
+
+## Names a control so tutorial tips can point at it ("panel:<name>").
+func anchor(anchor_name: String, c: Control) -> void:
+	anchors[anchor_name] = c
 
 
 func _process(delta: float) -> void:

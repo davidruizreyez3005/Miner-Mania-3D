@@ -734,6 +734,14 @@ func _validate_balance(e: Array) -> void:
 		e.append("balance offline caps invalid")
 	if not region_by_id.has(String(bal("start", "region", ""))):
 		e.append("balance start.region unknown")
+	var tut_objectives := []
 	for step in tutorial:
 		if String(step.get("complete_on", "")) == "":
 			e.append("tutorial step '%s' needs complete_on" % step.get("id", "?"))
+		for o in step.get("done_when", []):
+			tut_objectives.append({"id": step.get("id", "?"), "objective": o})
+		for key in ["anchor", "anchor_else"]:
+			var kind := String(step.get(key, "")).get_slice(":", 0)
+			if not kind in ["", "button", "hud", "panel", "world"]:
+				e.append("tutorial step '%s' has an unknown %s '%s'" % [step.get("id", "?"), key, step.get(key)])
+	_validate_objectives("tutorial step", tut_objectives, e)

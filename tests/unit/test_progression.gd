@@ -52,7 +52,7 @@ func test_legacy_upgrades() -> void:
 	assert_err(sim.execute({"type": "buy_legacy", "upgrade": "automation_blueprints"}), "max_level")
 	sim.state.run_stats["earned"] = 2e9
 	assert_ok(sim.execute({"type": "prestige", "region": "timberline_valley"}))
-	assert_near(sim.state.money, 500.0, 1e-9, "seed capital")
+	assert_near(sim.state.money, float(content().bal("start", "money", 0.0)) + 500.0, 1e-9, "seed capital")
 	assert_eq(sim.workers_at("headframe", "operator").size(), 1, "blueprint operator")
 	assert_eq(sim.workers_at("office", "supervisor").size(), 1, "blueprint manager")
 

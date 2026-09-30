@@ -51,8 +51,13 @@ func setup_foreman(m: AgentManager, asset_id: String) -> void:
 	add_child(ring)
 
 
-## Taps on a vein: walk there if needed, otherwise add a swing.
+## Taps on a vein: walk there if needed, otherwise add a swing. Taps while
+## already on the way to that vein queue swings for the arrival.
 func mine(d: int, slot: int) -> void:
+	if d == node_depth and slot == node_slot and _pending_mine and moving:
+		swings = mini(swings + 1, MAX_QUEUE)
+		_swing_speed = minf(2.6, 1.5 + 0.25 * float(swings))
+		return
 	if d == node_depth and slot == node_slot and not moving and _at_node():
 		swings = mini(swings + 1, MAX_QUEUE)
 		_swing_speed = minf(2.6, 1.5 + 0.25 * float(swings))

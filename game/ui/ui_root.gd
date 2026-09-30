@@ -37,7 +37,7 @@ const ERRORS := {
 	"node_depleted": "This vein is exhausted - it will regrow",
 	"lift_busy": "The cage is already running",
 	"trucks_busy": "The trucks are already on the road",
-	"warehouse_empty": "Nothing to sell yet - process some ore first",
+	"warehouse_empty": "Nothing to sell yet - mine some ore and wind the lift first",
 	"depth_locked": "Dig down to this depth first",
 	"previous_locked": "Dig the depth above first",
 	"requires_prestige": "Reachable after selling your first claim",
@@ -166,6 +166,16 @@ func open_panel(id: String, args: Dictionary = {}) -> GamePanel:
 	return p
 
 
+## The control an open panel named for tutorial tips ("panel:<name>"),
+## top-most panel first, or null.
+func panel_anchor(anchor_name: String) -> Control:
+	for i in range(stack.size() - 1, -1, -1):
+		var c: Control = (stack[i] as GamePanel).anchors.get(anchor_name)
+		if c != null and is_instance_valid(c) and c.is_visible_in_tree():
+			return c
+	return null
+
+
 func close_panel(p: GamePanel) -> void:
 	if p == null or not p in stack:
 		return
@@ -220,11 +230,11 @@ func _frame(p: GamePanel) -> void:
 	box.add_child(header)
 	p.content = UiKit.vbox(14)
 	p.content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(p.content)
 	box.add_child(scroll)
+	p.scroll = scroll
 	outer.add_child(box)
 	outer.add_child(p)                   # the panel node itself rides along (processing)
 	p.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)

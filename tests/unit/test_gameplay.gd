@@ -24,7 +24,9 @@ func _swing_until(sim: Simulation, units: float, d: int = 1) -> float:
 func test_new_game_state() -> void:
 	var sim := make_sim()
 	var s := sim.state
-	assert_eq(s.money, 0.0, "start money")
+	assert_eq(s.money, float(content().bal("start", "money", 0.0)), "start money")
+	# The tips ask for a miner and then a Mining Operations upgrade.
+	assert_ge(s.money, Economy.hire_cost(sim, "miner") + Economy.equipment_cost(sim, 1, "mining", 1), "the first tips are affordable")
 	assert_true(s.depth(1)["unlocked"], "depth 1 open")
 	assert_false(s.depth(2)["unlocked"], "depth 2 closed")
 	assert_eq(s.depth(1)["nodes"].size(), 3, "depth 1 veins")
@@ -56,6 +58,19 @@ func test_full_manual_loop_earns_money() -> void:
 	assert_finite_state(sim)
 
 
+func test_trucks_sent_early_sell_ore_on_its_way() -> void:
+	var sim := make_sim()
+	assert_err(sim.execute({"type": "dispatch"}), "warehouse_empty", "nothing mined yet")
+	_swing_until(sim, 6.0)
+	assert_err(sim.execute({"type": "dispatch"}), "warehouse_empty", "ore still at the station, the cage idle")
+	assert_ok(sim.execute({"type": "call_lift"}), "call lift")
+	assert_ok(sim.execute({"type": "dispatch"}), "the trucks wait for ore the cage is bringing up")
+	var before := sim.state.money
+	sim.advance(40.0, 0.1)
+	assert_gt(float(sim.state.run_stats.get("sold_units", 0.0)), 1.0, "sold as it arrived")
+	assert_gt(sim.state.money, before, "earned")
+
+
 func test_lift_without_operator_stops() -> void:
 	var sim := make_sim()
 	_swing_until(sim, 20.0)
@@ -68,9 +83,10 @@ func test_quest_claim_and_hire_miner() -> void:
 	_swing_until(sim, 12.0)
 	sim.tick(0.6)
 	assert_eq(sim.state.quests["q_first_swing"], "done", "quest completed")
+	var m0 := sim.state.money
 	var r := sim.execute({"type": "claim_quest", "quest": "q_first_swing"})
 	assert_ok(r, "claim")
-	assert_near(sim.state.money, 15.0, 1e-6, "reward paid")
+	assert_near(sim.state.money, m0 + 15.0, 1e-6, "reward paid")
 	assert_eq(sim.state.quests.get("q_first_lift", ""), "active", "next quest unlocked")
 	assert_err(sim.execute({"type": "claim_quest", "quest": "q_first_swing"}), "quest_not_done", "no double claim")
 	sim.state.money = 100.0
@@ -84,6 +100,7 @@ func test_quest_claim_and_hire_miner() -> void:
 
 func test_hire_validation() -> void:
 	var sim := make_sim()
+	sim.state.money = 0.0
 	assert_err(sim.execute({"type": "hire", "role": "miner", "post": "depth:1"}), "no_money")
 	sim.state.money = 1e6
 	assert_err(sim.execute({"type": "hire", "role": "miner", "post": "depth:2"}), "invalid_post", "locked depth")

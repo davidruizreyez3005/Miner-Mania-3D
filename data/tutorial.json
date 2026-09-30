@@ -1,14 +1,20 @@
 {
-  "_comment": "First-session tutorial. Each step shows a message anchored to a UI element or world target, and completes when the named game event fires (count times).",
-  "schema": 1,
+  "_comment": "First-session tutorial. Each step shows a message anchored to a UI element, a control in an open panel or a world target (anchor_else is used while the anchor is not on screen). A step completes when the named game event fires (count times), when any of its done_when objectives (quest objective format) already holds - so doing it early, or from another screen, still counts - or when the player taps Next.",
+  "schema": 2,
   "steps": [
     {"id": "welcome", "text": "Welcome to the claim, Foreman! The old company left this mine to rot. Let's bring it back to life.", "anchor": "", "complete_on": "tutorial_continue", "count": 1},
-    {"id": "mine", "text": "Tap the glowing ore vein in the Topsoil Drift to swing your pick. Keep tapping!", "anchor": "world:node:1:0", "complete_on": "manual_swing", "count": 5},
-    {"id": "lift", "text": "Ore piles up at the shaft station. Tap LIFT to wind it up to the surface.", "anchor": "button:lift", "complete_on": "lift_called", "count": 1},
-    {"id": "sell", "text": "The conveyor carries it to the warehouse. Tap SELL to send the truck to market.", "anchor": "button:sell", "complete_on": "sales_dispatched", "count": 1},
-    {"id": "hire", "text": "Money! Open the Topsoil Drift panel and hire a miner - they work while you rest.", "anchor": "world:depth:1", "complete_on": "worker_hired", "count": 1},
-    {"id": "upgrade", "text": "Upgrade Mining Operations to make every miner faster.", "anchor": "panel:depth_upgrade", "complete_on": "upgrade_bought", "count": 1},
-    {"id": "quests", "text": "Quests give big rewards. Check them often!", "anchor": "button:quests", "complete_on": "panel_opened:quests", "count": 1},
+    {"id": "mine", "text": "Tap the glowing ore vein in the Topsoil Drift. Every tap is a swing of your pick - keep tapping!", "anchor": "world:node:1:0", "complete_on": "manual_swing", "count": 5,
+     "done_when": [{"type": "stat", "stat": "manual_swings", "target": 5}]},
+    {"id": "lift", "text": "Ore piles up at the shaft station. Tap LIFT to wind it up to the surface.", "anchor": "button:lift", "complete_on": "lift_called", "count": 1,
+     "done_when": [{"type": "stat", "stat": "lifted", "target": 1}, {"type": "workers", "role": "operator", "post": "headframe", "target": 1}]},
+    {"id": "sell", "text": "The conveyor carries it to the warehouse. Tap SELL to send the truck to market.", "anchor": "button:sell", "complete_on": "sales_dispatched", "count": 1,
+     "done_when": [{"type": "stat", "stat": "sold_units", "target": 0.5}, {"type": "workers", "role": "supervisor", "post": "office", "target": 1}]},
+    {"id": "hire", "text": "Money! Tap the Topsoil Drift to open it and hire a miner - miners work while you rest.", "anchor": "panel:depth_hire_miner", "anchor_else": "world:depth:1", "complete_on": "worker_hired", "count": 1,
+     "done_when": [{"type": "workers", "role": "any", "target": 1}]},
+    {"id": "upgrade", "text": "Upgrade Mining Operations in the Topsoil Drift to make every miner faster.", "anchor": "panel:depth_upgrade", "anchor_else": "world:depth:1", "complete_on": "upgrade_bought", "count": 1,
+     "done_when": [{"type": "equipment_level", "depth": 1, "equipment": "mining", "target": 2}]},
+    {"id": "quests", "text": "Goals pay big rewards. Open Goals and check them often!", "anchor": "button:quests", "complete_on": "panel_opened:quests", "count": 1,
+     "done_when": [{"type": "quests", "target": 1}]},
     {"id": "done", "text": "Automate the lift and the trucks, dig deeper, and build a mining empire. Good luck!", "anchor": "", "complete_on": "tutorial_continue", "count": 1}
   ]
 }

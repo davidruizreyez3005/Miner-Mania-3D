@@ -1,10 +1,10 @@
 class_name TouchInput
 extends Node
-## Gestures on the 3D view. One finger drags to pan (with inertia), pinch
-## zooms, a two-finger twist rotates, a tap picks what is under the finger
-## and a double tap zooms toward it. Mouse wheel / right-drag and keys
-## (WASD, Q/E, +/-) do the same on desktop. UI controls receive events first;
-## this only sees what the UI did not consume.
+## Gestures on the 3D view. One finger drags to pan (with inertia), two
+## fingers pinch to zoom and drag together to pan, a tap picks what is under
+## the finger and a double tap zooms toward it. The camera never rotates.
+## Mouse wheel and keys (WASD / arrows, +/-) do the same on desktop. UI
+## controls receive events first; this only sees what the UI did not consume.
 ##
 ## Picking asks the physics world for every tap target along the ray and
 ## prefers veins over workers over buildings over whole galleries, so the
@@ -24,12 +24,10 @@ var _touches := {}                 # index -> Vector2
 var _start := {}                   # index -> [Vector2, msec]
 var _dragging := false
 var _pinch_d := 0.0
-var _pinch_a := 0.0
 var _pinch_mid := Vector2.ZERO
 var _last_tap_ms := -10000
 var _last_tap_p := Vector2.ZERO
 var _vel := Vector2.ZERO
-var _rot_drag := false
 
 
 func setup(r: CameraRig, w: MineWorld) -> void:
@@ -51,10 +49,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			rig.zoom_by(0.88)
 		elif mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			rig.zoom_by(1.13)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT:
-			_rot_drag = mb.pressed
-	elif event is InputEventMouseMotion and _rot_drag:
-		rig.rotate_by((event as InputEventMouseMotion).relative.x * 0.25)
 	elif event is InputEventMagnifyGesture:
 		rig.zoom_by(1.0 / maxf((event as InputEventMagnifyGesture).factor, 0.01))
 	elif event is InputEventPanGesture:
@@ -110,14 +104,11 @@ func _drag(e: InputEventScreenDrag) -> void:
 		var a: Vector2 = pts[0]
 		var b: Vector2 = pts[1]
 		var d := a.distance_to(b)
-		var ang := (b - a).angle()
 		var mid := (a + b) * 0.5
 		if _pinch_d > 1.0 and d > 1.0:
 			rig.zoom_by(_pinch_d / d)
-		rig.rotate_by(rad_to_deg(wrapf(ang - _pinch_a, -PI, PI)) * -1.0)
 		rig.pan_pixels(mid - _pinch_mid)
 		_pinch_d = d
-		_pinch_a = ang
 		_pinch_mid = mid
 
 
@@ -126,7 +117,6 @@ func _begin_pinch() -> void:
 	var a: Vector2 = pts[0]
 	var b: Vector2 = pts[1]
 	_pinch_d = a.distance_to(b)
-	_pinch_a = (b - a).angle()
 	_pinch_mid = (a + b) * 0.5
 	_dragging = true
 
@@ -146,10 +136,6 @@ func _process(delta: float) -> void:
 		k.y -= 1.0
 	if k != Vector2.ZERO:
 		rig.pan_pixels(k * 900.0 * delta)
-	if Input.is_key_pressed(KEY_Q):
-		rig.rotate_by(-60.0 * delta)
-	if Input.is_key_pressed(KEY_E):
-		rig.rotate_by(60.0 * delta)
 	if Input.is_key_pressed(KEY_EQUAL) or Input.is_key_pressed(KEY_KP_ADD):
 		rig.zoom_by(1.0 - 1.2 * delta)
 	if Input.is_key_pressed(KEY_MINUS) or Input.is_key_pressed(KEY_KP_SUBTRACT):

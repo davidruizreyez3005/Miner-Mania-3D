@@ -207,7 +207,10 @@ func command(cmd: Dictionary) -> Dictionary:
 	var r := sim.execute(cmd)
 	_flush_events()
 	EventBus.command_result.emit(cmd, r)
-	if r.get("ok", false):
+	# A tap on LIFT / SELL while the cage or the trucks are already running
+	# still does what the player asked for (tutorial tips count it).
+	var busy := String(r.get("error", "")) in ["lift_busy", "trucks_busy"]
+	if r.get("ok", false) or busy:
 		match String(cmd.get("type", "")):
 			"manual_swing":
 				EventBus.tutorial("manual_swing")
