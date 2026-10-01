@@ -102,6 +102,16 @@ func _pan_world(d: Vector2) -> void:
 	_clamp_target()
 
 
+## A finger lands on the view: a flight in progress stops where it is and
+## the view follows the finger 1:1 until it lifts (easing toward the finger
+## would make the content trail behind it, worst at a low frame rate).
+func grab() -> void:
+	dragging = true
+	pan_velocity = Vector3.ZERO
+	target_focus = focus
+	target_dist = dist
+
+
 func zoom_by(factor: float) -> void:
 	target_dist = clampf(target_dist * factor, min_dist, _max_dist_here())
 
@@ -198,7 +208,7 @@ func _process(delta: float) -> void:
 func _apply(delta: float) -> void:
 	# Reduced motion: shorter, snappier camera moves.
 	var ease := EASE * (2.5 if bool(Settings.get_value("reduce_motion", false)) else 1.0)
-	var a := clampf(delta * ease, 0.0, 1.0)
+	var a := 1.0 if dragging else clampf(delta * ease, 0.0, 1.0)
 	focus = focus.lerp(target_focus, a)
 	dist = lerpf(dist, target_dist, a)
 	_u = clampf(-(focus.y + 0.5) / 5.5, 0.0, 1.0)

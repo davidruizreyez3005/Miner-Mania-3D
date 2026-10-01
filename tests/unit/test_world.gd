@@ -222,6 +222,14 @@ func test_camera_drags_follow_the_finger() -> void:
 		rig.pan_pixels(Vector2(0, 40))
 	assert_eq(rig.target_focus.y, 0.0, "dragging down climbs back to the camp")
 	assert_lt(rig.target_focus.z, CameraRig.FRONT_Z, "and on into the camp")
+	# While a finger is down the view sticks to it (no easing lag).
+	rig.focus_target("depth:2")
+	rig._process(1.0 / 30.0)
+	rig.grab()
+	rig.pan_pixels(Vector2(120, -60))
+	rig._process(1.0 / 30.0)
+	assert_true(rig.focus.is_equal_approx(rig.target_focus), "drag follows the finger 1:1")
+	rig.dragging = false
 	# The view never turns.
 	for i in 30:
 		rig._process(1.0 / 30.0)

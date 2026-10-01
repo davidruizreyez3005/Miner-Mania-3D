@@ -163,7 +163,9 @@ hired worker (pooled) and the player's `Foreman`:
 the focus height - a high 3/4 view over the camp, a near-level view into the
 galleries - and a drag past the camp's front edge flows down the cut face.
 Drags keep the content under the finger everywhere (up the screen is toward
-the cut edge on the surface and deeper underground). Pan with inertia, pinch
+the cut edge on the surface and deeper underground), 1:1 while the finger is
+down - easing is only for flights, inertia and zoom, so the view never trails
+the finger at a low frame rate. Pan with inertia, pinch
 zoom, focus flights, following an agent, bounds, and see-through buildings
 in front of the focus; the camera does not rotate. `TouchInput` turns gestures
 into camera moves and taps into actions, picking veins before workers before
@@ -257,7 +259,9 @@ calls and 80-115 k triangles per view early in the game, 115-235 calls and
 115-225 k triangles with 70 workers and five depths.
 
 Android frame pacing (Swappy) is on for phones: it keeps frames evenly
-spaced at the 30 fps cap and on 90/120 Hz screens. The emulator's virtual
+spaced at the 30 fps cap and on 90/120 Hz screens. Agile input flushing hands
+touches to the game before every physics step, not once per drawn frame,
+which keeps taps and drags responsive on a phone below its frame target. The emulator's virtual
 Vulkan GPU cannot present with it, so x86_64 builds - only the emulator
 test twin - turn it off with a feature override in `project.godot`.
 

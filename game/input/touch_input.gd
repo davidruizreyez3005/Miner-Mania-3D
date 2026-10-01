@@ -61,8 +61,7 @@ func _touch(e: InputEventScreenTouch) -> void:
 		_start[e.index] = [e.position, Time.get_ticks_msec()]
 		if _touches.size() == 1:
 			_dragging = false
-			rig.dragging = true
-			rig.pan_velocity = Vector3.ZERO
+			rig.grab()
 			_vel = Vector2.ZERO
 		elif _touches.size() == 2:
 			_begin_pinch()
