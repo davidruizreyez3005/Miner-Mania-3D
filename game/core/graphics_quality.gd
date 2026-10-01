@@ -71,11 +71,15 @@ static func detect_here() -> Dictionary:
 
 
 ## Total memory in bytes (0 when unknown). The engine does not report it on
-## Android; the kernel does, in /proc/meminfo.
+## Android (and its file access cannot open /proc there), so Android asks
+## the platform: android.system.Os.sysconf(_SC_PHYS_PAGES * _SC_PAGESIZE)
+## through the Java bridge. Elsewhere /proc/meminfo is the fallback.
 static func physical_memory() -> int:
 	var mem := int(OS.get_memory_info().get("physical", -1))
 	if mem > 0:
 		return mem
+	if OS.has_feature("android"):
+		return _android_memory()
 	var f := FileAccess.open("/proc/meminfo", FileAccess.READ)
 	if f == null:
 		return 0
@@ -83,6 +87,22 @@ static func physical_memory() -> int:
 	while not f.eof_reached() and text.length() < 4096:
 		text += f.get_line() + "\n"
 	return meminfo_total(text)
+
+
+static func _android_memory() -> int:
+	var os_class = JavaClassWrapper.wrap("android.system.Os")
+	var consts = JavaClassWrapper.wrap("android.system.OsConstants")
+	if os_class == null or consts == null:
+		return 0
+	var phys_key = consts.get("_SC_PHYS_PAGES")
+	var size_key = consts.get("_SC_PAGESIZE")
+	if not (phys_key is int and size_key is int):
+		return 0
+	var pages = os_class.sysconf(phys_key)
+	var page = os_class.sysconf(size_key)
+	if pages is int and page is int and int(pages) > 0 and int(page) >= 1024:
+		return int(pages) * int(page)
+	return 0
 
 
 ## Bytes of "MemTotal:" in a /proc/meminfo text (0 when absent).

@@ -96,10 +96,14 @@
    }
   ],
   "detect": {
-   "_comment": "First launch on a phone: Low for the OpenGL ES fallback, under low_ram_gb of memory or a GPU matching low_gpu; High for a GPU matching high_gpu with at least high_ram_gb; Medium otherwise. Desktop builds start on High.",
+   "_comment": "First launch on a phone: Low for the OpenGL ES fallback, under low_ram_gb of memory or a GPU matching low_gpu (software renderers included); High for a GPU matching high_gpu with at least high_ram_gb; Medium otherwise. Desktop builds start on High.",
    "low_ram_gb": 4.5,
    "high_ram_gb": 7.5,
    "low_gpu": [
+    "llvmpipe",
+    "lavapipe",
+    "SwiftShader",
+    "softpipe",
     "Mali-G5[0-7]",
     "Mali-G3",
     "Mali-T",

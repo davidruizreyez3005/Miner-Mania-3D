@@ -56,6 +56,8 @@ func test_device_detection() -> void:
 		["Mali-G710 MC10", 8 * GB, "mobile", true, GraphicsQuality.HIGH, "Mali-G710"],
 		["Adreno (TM) 740", 0, "mobile", true, GraphicsQuality.MEDIUM, "flagship GPU, memory unknown"],
 		["Some Future GPU", 8 * GB, "mobile", true, GraphicsQuality.MEDIUM, "unknown GPU"],
+		["llvmpipe (LLVM 21.0.0, 256 bits)", 0, "mobile", true, GraphicsQuality.LOW, "software renderer"],
+		["SwiftShader Device (Subzero)", 0, "mobile", true, GraphicsQuality.LOW, "SwiftShader"],
 	]
 	for c in cases:
 		var r := GraphicsQuality.detect(String(c[0]), int(c[1]), String(c[2]), bool(c[3]))

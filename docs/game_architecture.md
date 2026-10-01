@@ -234,10 +234,12 @@ reflections):
 | Frame cap | 30 fps | 60 fps | 60 fps |
 
 The first launch picks a preset for the device (`Settings` and
-`GraphicsQuality.detect`; on Android the memory size comes from
-`/proc/meminfo`, which the engine does not report there): Low on the OpenGL
-ES fallback, under 4.5 GB of memory or with an entry-level GPU (Mali-G31..G57, Mali-T, PowerVR, Adreno
-3xx-61x), High for a flagship GPU with 7.5 GB or more, Medium otherwise.
+`GraphicsQuality.detect`; the engine does not report the memory size on
+Android, so it is asked from the platform through the Java bridge -
+`android.system.Os.sysconf`): Low on the OpenGL ES fallback, under 4.5 GB
+of memory or with an entry-level or software GPU (Mali-G31..G57, Mali-T,
+PowerVR, Adreno 3xx-61x, llvmpipe, SwiftShader), High for a flagship GPU
+with 7.5 GB or more, Medium otherwise.
 While the choice is automatic, `FrameWatchdog` measures the frame rate in
 play and steps down a level when it stays under 80 % of the cap; a quality
 the player picks sticks. Presets apply live: the viewport (3D scale, MSAA,
