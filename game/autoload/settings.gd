@@ -59,7 +59,8 @@ func choose_graphics_for_device() -> void:
 	values["quality_auto"] = true
 	values["graphics_rev"] = GRAPHICS_REV
 	values["fps_limit"] = int(GraphicsQuality.value(q, "fps", 60))
-	print("[graphics] %s for this device (%s)" % [String(GraphicsQuality.value(q, "name", "?")), String(detected["reason"])])
+	print("[graphics] %s for this device (%s; %s, %.1f GB memory)" % [String(GraphicsQuality.value(q, "name", "?")), String(detected["reason"]),
+		RenderingServer.get_video_adapter_name(), float(GraphicsQuality.physical_memory()) / 1073741824.0])
 	save_settings()
 
 

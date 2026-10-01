@@ -62,6 +62,17 @@ func test_device_detection() -> void:
 		assert_eq(int(r["quality"]), int(c[4]), "%s -> %s (%s)" % [c[5], GraphicsQuality.value(int(c[4]), "name"), r["reason"]])
 
 
+func test_memory_from_meminfo() -> void:
+	# Android: the engine reports no memory size, so detection reads the
+	# kernel's /proc/meminfo (a 4 GB emulator, a 3 GB phone).
+	var sample := "MemTotal:        4011272 kB\nMemFree:          195016 kB\nMemAvailable:    1730416 kB\n"
+	assert_eq(GraphicsQuality.meminfo_total(sample), 4011272 * 1024, "MemTotal in bytes")
+	assert_eq(GraphicsQuality.meminfo_total("MemFree: 5 kB\n"), 0, "no MemTotal: unknown")
+	var r := GraphicsQuality.detect("llvmpipe (LLVM 21.0.0, 256 bits)", GraphicsQuality.meminfo_total(sample), "mobile", true)
+	assert_eq(int(r["quality"]), GraphicsQuality.LOW, "a 4 GB device with an unlisted GPU gets Low (%s)" % r["reason"])
+	assert_gt(GraphicsQuality.physical_memory(), 0, "this machine's memory is known")
+
+
 func _small_world() -> MineWorld:
 	if _world == null:
 		var sim := Simulation.new(content())

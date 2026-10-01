@@ -66,9 +66,33 @@ static func detect(gpu: String, ram_bytes: int, rendering_method: String, mobile
 
 ## detect() for the device the game runs on.
 static func detect_here() -> Dictionary:
-	var mem := OS.get_memory_info()
-	return detect(RenderingServer.get_video_adapter_name(), int(mem.get("physical", 0)),
+	return detect(RenderingServer.get_video_adapter_name(), physical_memory(),
 		RenderingServer.get_current_rendering_method(), OS.has_feature("mobile"))
+
+
+## Total memory in bytes (0 when unknown). The engine does not report it on
+## Android; the kernel does, in /proc/meminfo.
+static func physical_memory() -> int:
+	var mem := int(OS.get_memory_info().get("physical", -1))
+	if mem > 0:
+		return mem
+	var f := FileAccess.open("/proc/meminfo", FileAccess.READ)
+	if f == null:
+		return 0
+	var text := ""
+	while not f.eof_reached() and text.length() < 4096:
+		text += f.get_line() + "\n"
+	return meminfo_total(text)
+
+
+## Bytes of "MemTotal:" in a /proc/meminfo text (0 when absent).
+static func meminfo_total(text: String) -> int:
+	for line in text.split("\n"):
+		if line.begins_with("MemTotal:"):
+			var parts := line.substr(9).strip_edges().split(" ", false)
+			if not parts.is_empty() and parts[0].is_valid_int():
+				return int(parts[0]) * (1024 if parts.size() < 2 or parts[1].to_lower() == "kb" else 1)
+	return 0
 
 
 static func _matches(pattern: String, text: String) -> bool:
