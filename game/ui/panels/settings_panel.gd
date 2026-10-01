@@ -34,12 +34,14 @@ func build() -> void:
 	section("Graphics")
 	var q := UiKit.hbox(8)
 	for i in 3:
-		var b := UiKit.button(["Low", "Medium", "High"][i], func() -> void:
-			Settings.set_value("quality", i)
+		var b := UiKit.button(String(GraphicsQuality.value(i, "name", ["Low", "Medium", "High"][i])), func() -> void:
+			Settings.choose_quality(i)
 			rebuild(), "Primary" if int(Settings.get_value("quality", 1)) == i else "Chip", 80)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		q.add_child(b)
 	content.add_child(q)
+	content.add_child(UiKit.wrap("Low is made for entry-level phones: lower 3D resolution, simpler lighting and scenery, 30 FPS." +
+		(" Chosen automatically for this phone - it steps down by itself if the game cannot keep up." if bool(Settings.get_value("quality_auto", true)) else "")))
 	var f := UiKit.hbox(8)
 	for fps in [30, 60]:
 		var b2 := UiKit.button("%d FPS" % fps, func() -> void:

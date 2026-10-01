@@ -186,6 +186,7 @@ func _run() -> void:
 			failures.append("state not restored after closing %s: %s" % [p[0], GameStateMachine.name_of(_state())])
 	await _scroll_by_touch(ui)
 	await _camera_by_touch()
+	await _switch_quality()
 	# Memory: opening and closing every panel again and again must not leave
 	# objects or orphan nodes behind (the first pass warms the caches).
 	var counts: Array = []
@@ -444,3 +445,24 @@ func _camera_by_touch() -> void:
 	if absf(fwd.x) > 0.01:
 		failures.append("a two-finger twist turned the camera (forward %s)" % str(fwd))
 	log_lines.append("camera_by_touch")
+
+
+## Graphics presets switch live in the open mine (Settings > Graphics).
+func _switch_quality() -> void:
+	var settings = root.get_node("Settings")
+	var gq: GDScript = load("res://game/core/graphics_quality.gd")      # reads autoloads: loaded at run time
+	var q0 := int(settings.get_value("quality", 1))
+	var auto0 := bool(settings.get_value("quality_auto", true))
+	var w = main.world_ref()
+	for q in [0, 1, 2]:
+		settings.choose_quality(q)
+		await _frames(20)
+		var want := float(gq.value(q, "render_scale", 1.0))
+		if absf(root.scaling_3d_scale - want) > 1e-4:
+			failures.append("quality %d: 3D scale %.2f, expected %.2f" % [q, root.scaling_3d_scale, want])
+		if w.atmosphere.sun.shadow_enabled != bool(gq.value(q, "shadows", true)):
+			failures.append("quality %d: sun shadows not applied" % q)
+	settings.choose_quality(q0)
+	settings.values["quality_auto"] = auto0
+	await _frames(10)
+	log_lines.append("graphics_presets_live")

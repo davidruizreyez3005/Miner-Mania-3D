@@ -5,7 +5,7 @@ Installs the APK, launches it and plays the first minutes with real touch
 input (adb `input`, which goes through Android's input pipeline like a
 finger), following the game through the lines it logs:
 
-    [boot] ...                 version, window/view size, renderer
+    [boot] ...                 version, window/view size, renderer, graphics preset
     [state] A -> B             every game-state transition
     [save] written: ...        every save (claim time, money)
 
@@ -39,6 +39,7 @@ PACKAGE = "com.minermania.mm3d"
 
 LOG_RE = re.compile(r"^\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+\s+(\d+)\s+(\d+)\s+([VDIWEFA])\s+(.*?)\s*: (.*)$")
 BOOT_RE = re.compile(r"\[boot\] (.*) window \((\d+), (\d+)\), view \(([\d.]+), ([\d.]+)\), (.*)$")
+GRAPHICS_RE = re.compile(r", graphics (\w+)( \(auto\))?$")
 SAVE_RE = re.compile(r"\[save\] (written|FAILED): claim time (\d+) s, money (\d+)")
 GODOT_ERROR_PREFIXES = ("SCRIPT ERROR", "USER SCRIPT ERROR", "ERROR", "USER ERROR")
 # What Godot logs when it probes Vulkan on a device without it and switches to
@@ -306,6 +307,10 @@ class Run:
         driver = m.group(6).split(" ")[0].split("/")[-1]
         if self.args.expect_driver and driver != self.args.expect_driver:
             raise Failure(f"the game runs on {driver}, expected {self.args.expect_driver}: {m.group(6)}")
+        g = GRAPHICS_RE.search(msg)
+        self.report["graphics"] = (g.group(1) + (" (auto)" if g.group(2) else "")) if g else None
+        if self.args.expect_graphics and (not g or g.group(1) != self.args.expect_graphics):
+            raise Failure(f"graphics preset {self.report['graphics']}, expected {self.args.expect_graphics}: {msg}")
         self.log.wait(r"^\[state\] BOOT -> MAIN_MENU", self.t(300))
         self.report["title_s"] = round(time.monotonic() - t0, 1)
         self.pid0 = self.dev.pid()
@@ -483,6 +488,8 @@ class Run:
         if r.get("renderer"):
             lines.append(f"- {PACKAGE} {r.get('version_name', '?')} on `{r.get('primary_abi', '?')}`, "
                          f"window {r.get('window')}, renderer {r.get('renderer')}")
+        if r.get("graphics"):
+            lines.append(f"- graphics preset picked on first launch: {r['graphics']}")
         for k, label in (("title_s", "title screen after launch"), ("world_load_s", "world loaded after tap"),
                          ("memory_pss_mb", "memory PSS (MB)"),
                          ("emulator_frame_ms_median", "frame time on this software-rendered emulator (ms, median)")):
@@ -517,6 +524,7 @@ def main() -> int:
                     help="multiply every wait limit (software-rendered emulators draw a frame every few seconds)")
     ap.add_argument("--label", default="", help="name of this run in the report (e.g. the build variant)")
     ap.add_argument("--expect-driver", default="", help="fail unless the game renders with this driver (vulkan, opengl3)")
+    ap.add_argument("--expect-graphics", default="", help="fail unless the first launch picks this graphics preset (Low, Medium, High)")
     args = ap.parse_args()
     if not args.apk.is_file():
         print(f"error: {args.apk} not found", file=sys.stderr)

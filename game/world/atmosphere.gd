@@ -63,15 +63,25 @@ func setup(region: Dictionary) -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 90.0
 	sun.light_cull_mask = LAYER_SURFACE
+	# Only surface geometry lies in the sun's light: the galleries under the
+	# camp stay out of its shadow map too.
+	sun.shadow_caster_mask = LAYER_SURFACE
 	sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY
 	add_child(sun)
-	apply_quality(int(Settings.get_value("quality", 1)))
+	apply_quality(GraphicsQuality.current())
 
 
+## Graphics preset: sun shadows (and their reach) and glow; the cheap
+## shading of Low also drops the fog's aerial perspective and sky
+## reflections (each a cube-map read for every pixel).
 func apply_quality(q: int) -> void:
-	sun.shadow_enabled = q >= 1
-	sun.directional_shadow_max_distance = [60.0, 90.0, 130.0][clampi(q, 0, 2)]
-	env.glow_enabled = q >= 1
+	var p := GraphicsQuality.preset(q)
+	var lite := bool(p.get("lite_shaders", false))
+	sun.shadow_enabled = bool(p.get("shadows", true))
+	sun.directional_shadow_max_distance = float(p.get("shadow_distance", 90.0))
+	env.glow_enabled = bool(p.get("glow", true))
+	env.fog_aerial_perspective = 0.0 if lite else 0.35
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if lite else Environment.REFLECTION_SOURCE_SKY
 	env.sdfgi_enabled = false
 	env.ssao_enabled = false
 

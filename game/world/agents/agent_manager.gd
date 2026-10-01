@@ -28,6 +28,9 @@ var _fx_budget := FX_PER_S
 var _sound_budget := 4.0
 var _select_ring: MeshInstance3D
 var _detail_t := 0.0
+var _max_full := MAX_FULL_RIGS            # graphics preset (apply_quality)
+var _detail_scale := 1.0
+var _fx_rate := FX_PER_S
 
 
 func setup(w: MineWorld) -> void:
@@ -104,7 +107,7 @@ func sync(delta: float) -> void:
 	for a in agents.values():
 		(a as WorkerAgent).tick(delta)
 	foreman.tick(delta)
-	_fx_budget = minf(FX_PER_S, _fx_budget + delta * FX_PER_S)
+	_fx_budget = minf(_fx_rate, _fx_budget + delta * _fx_rate)
 	_sound_budget = minf(4.0, _sound_budget + delta * 4.0)
 	_detail_t -= delta
 	if _detail_t <= 0.0:
@@ -170,6 +173,15 @@ func _swap_foreman_outfit() -> void:
 	foreman.swung.connect(func(r: Dictionary) -> void: foreman_swung.emit(r))
 
 
+## Graphics preset: how many crew rigs animate at full rate, how far the
+## animation detail reaches and how many impact effects fly.
+func apply_quality(p: Dictionary) -> void:
+	_max_full = int(p.get("max_full_rigs", MAX_FULL_RIGS))
+	_detail_scale = clampf(float(p.get("detail_scale", 1.0)), 0.3, 1.0)
+	_fx_rate = FX_PER_S * clampf(float(p.get("vfx", 1.0)), 0.1, 1.0)
+	_detail_t = 0.0
+
+
 ## Animation detail: nearest rigs animate every frame, far ones at a low
 ## rate, off-screen or very far ones not at all.
 func _update_detail() -> void:
@@ -186,10 +198,10 @@ func _update_detail() -> void:
 		var dist := sqrt(float(item[0]))
 		var rig: CharacterRig = (item[1] as WorkerAgent).rig
 		var lv := CharacterRig.DETAIL_FROZEN
-		if dist < FULL_DETAIL_M and full < MAX_FULL_RIGS:
+		if dist < FULL_DETAIL_M * _detail_scale and full < _max_full:
 			lv = CharacterRig.DETAIL_FULL
 			full += 1
-		elif dist < REDUCED_DETAIL_M:
+		elif dist < REDUCED_DETAIL_M * _detail_scale:
 			lv = CharacterRig.DETAIL_REDUCED
 		rig.set_detail(lv)
 	foreman.rig.set_detail(CharacterRig.DETAIL_FULL)

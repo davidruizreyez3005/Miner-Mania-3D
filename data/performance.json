@@ -1,11 +1,11 @@
 {
- "_comment": "Performance budgets checked by the automated tests (tests/unit/test_world.gd, test_balance.gd) and reported by tools/godot/perf_report.gd. Triangle counts are at full detail (LOD0) for everything placed in the built world; per-frame numbers are what the target mid-range phone must sustain.",
+ "_comment": "Performance budgets checked by the automated tests (tests/unit/test_world.gd, test_graphics.gd, test_balance.gd) and reported by tools/godot/perf_report.gd and bench_frame.gd. Triangle counts are at full detail (LOD0) for everything placed in the built world. 'graphics' holds the Low / Medium / High presets (Settings > Graphics), how the first launch picks one for the device, and the frame-rate watchdog that steps down when a phone cannot keep up.",
  "schema": 1,
  "target_fps": 60,
  "min_fps": 30,
  "triangles": {
-  "surface_lod0": 3200000,
-  "gallery_lod0_each": 350000,
+  "surface_lod0": 1000000,
+  "gallery_lod0_each": 90000,
   "character_lod0": 26000
  },
  "agents": {
@@ -18,5 +18,134 @@
  },
  "world_build": {
   "max_distinct_models": 140
+ },
+ "graphics": {
+  "_comment": "render_scale: 3D resolution (the UI stays sharp); msaa: 0 off, 1 = 2x; anisotropy: 0 off, 1 = 2x, 2 = 4x; mesh_lod_threshold: pixels of error allowed by automatic mesh LODs; lite_shaders / lite_materials: one-texture terrain and rock, no normal / roughness / metal / AO maps on models; gallery_lamps: real lights among each gallery's 4 hanging lamps (the rest only glow); decor_density: share of trees, bushes, grass and rocks drawn; detail_scale: distance scale for animated crews and far scenery; fps: default frame cap for the preset.",
+  "presets": [
+   {
+    "name": "Low",
+    "render_scale": 0.6,
+    "msaa": 0,
+    "anisotropy": 0,
+    "mesh_lod_threshold": 4.0,
+    "shadows": false,
+    "shadow_atlas": 1024,
+    "shadow_distance": 45.0,
+    "glow": false,
+    "lite_shaders": true,
+    "lite_materials": true,
+    "gallery_lamps": 0,
+    "shaft_lights": false,
+    "crystal_lights": false,
+    "decor_density": 0.35,
+    "grass": false,
+    "decor_shadows": false,
+    "detail_scale": 0.6,
+    "max_full_rigs": 8,
+    "vfx": 0.4,
+    "camera_far": 320.0,
+    "fps": 30
+   },
+   {
+    "name": "Medium",
+    "render_scale": 0.8,
+    "msaa": 0,
+    "anisotropy": 1,
+    "mesh_lod_threshold": 2.0,
+    "shadows": true,
+    "shadow_atlas": 1024,
+    "shadow_distance": 55.0,
+    "glow": false,
+    "lite_shaders": false,
+    "lite_materials": false,
+    "gallery_lamps": 2,
+    "shaft_lights": true,
+    "crystal_lights": true,
+    "decor_density": 0.7,
+    "grass": true,
+    "decor_shadows": false,
+    "detail_scale": 0.8,
+    "max_full_rigs": 16,
+    "vfx": 0.75,
+    "camera_far": 500.0,
+    "fps": 60
+   },
+   {
+    "name": "High",
+    "render_scale": 1.0,
+    "msaa": 1,
+    "anisotropy": 2,
+    "mesh_lod_threshold": 1.0,
+    "shadows": true,
+    "shadow_atlas": 2048,
+    "shadow_distance": 90.0,
+    "glow": true,
+    "lite_shaders": false,
+    "lite_materials": false,
+    "gallery_lamps": 4,
+    "shaft_lights": true,
+    "crystal_lights": true,
+    "decor_density": 1.0,
+    "grass": true,
+    "decor_shadows": true,
+    "detail_scale": 1.0,
+    "max_full_rigs": 28,
+    "vfx": 1.0,
+    "camera_far": 700.0,
+    "fps": 60
+   }
+  ],
+  "detect": {
+   "_comment": "First launch on a phone: Low for the OpenGL ES fallback, under low_ram_gb of memory or a GPU matching low_gpu; High for a GPU matching high_gpu with at least high_ram_gb; Medium otherwise. Desktop builds start on High.",
+   "low_ram_gb": 4.5,
+   "high_ram_gb": 7.5,
+   "low_gpu": [
+    "Mali-G5[0-7]",
+    "Mali-G3",
+    "Mali-T",
+    "Mali-4",
+    "PowerVR",
+    "GE8",
+    "IMG ",
+    "Adreno \\(TM\\) [345][0-9][0-9]",
+    "Adreno \\(TM\\) 6[01][0-9]"
+   ],
+   "high_gpu": [
+    "Adreno \\(TM\\) (7[3-9][0-9]|8[0-9][0-9])",
+    "Mali-G7[1-9]",
+    "Mali-G[6-9][1-9]0",
+    "Immortalis",
+    "Xclipse"
+   ]
+  },
+  "watchdog": {
+   "_comment": "While the quality is the automatic choice: after settle_s in play, the average frame rate over window_s must reach min_share of the frame cap, or the quality steps down one level (and the cap drops to 30 on Low).",
+   "settle_s": 6.0,
+   "window_s": 15.0,
+   "min_share": 0.8
+  },
+  "render_budgets": {
+   "_comment": "Most draw calls and triangles per frame in each benchmark view (gallery, surface, plant) of a claim at a stage of the game, by preset; checked by tools/godot/bench_frame.gd --check with a real renderer (CI: Xvfb + Mesa lavapipe, 720x1600). Draw calls include the HUD.",
+   "early": {
+    "Low": {
+     "draw_calls": 160,
+     "triangles": 135000
+    },
+    "Medium": {
+     "draw_calls": 190,
+     "triangles": 290000
+    },
+    "High": {
+     "draw_calls": 215,
+     "triangles": 380000
+    }
+   },
+   "mid": {
+    "Low": {
+     "draw_calls": 280,
+     "triangles": 270000
+    }
+   }
+  }
  }
 }

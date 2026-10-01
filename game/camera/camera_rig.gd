@@ -45,10 +45,15 @@ func setup(w: MineWorld) -> void:
 	camera.name = "Camera"
 	camera.fov = 52.0
 	camera.near = 0.3
-	camera.far = 700.0
+	camera.far = float(GraphicsQuality.current_value("camera_far", 700.0))
 	add_child(camera)
 	camera.current = true
+	EventBus.quality_changed.connect(_on_quality_changed)
 	_apply(1.0)
+
+
+func _on_quality_changed(q: int) -> void:
+	camera.far = float(GraphicsQuality.value(q, "camera_far", 700.0))
 
 
 # ---------------------------------------------------------------- controls

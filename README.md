@@ -30,9 +30,16 @@ is built, tested and exported to an APK by GitHub Actions.
 - **Idle for real**: offline progress is simulated on load (capped and
   guarded against clock tricks) and reported in "WHILE YOU WERE AWAY".
 - **Mobile-first**: portrait touch controls (drag to pan, pinch to zoom,
-  tap to mine), progressive disclosure UI, tutorial coaching, VRAM-compressed
-  textures, crew LOD models, animation detail by distance, atomic saves with
-  backup and corruption recovery.
+  tap to mine, drag to scroll every menu), progressive disclosure UI,
+  tutorial coaching, atomic saves with backup and corruption recovery.
+- **Runs on entry-level phones**: Low / Medium / High graphics presets, the
+  first launch picks one for the device (Low for the OpenGL ES fallback,
+  under 4.5 GB of memory or an entry-level GPU) and a frame-rate watchdog
+  steps down when the phone cannot keep up. Low renders 3D at 60 % with
+  one-texture terrain and rock, per-vertex lighting, no shadows, MSAA or
+  glow, fewer real lights and thinner scenery, at 30 fps with Android frame
+  pacing - about six times cheaper per frame than the previous Low preset
+  (seven times cheaper than the previous default).
 
 ## Repository map
 
@@ -63,10 +70,12 @@ blender --background --factory-startup --python blender/build.py -- --profile fu
 python tools/audio/synth.py && python tools/textures/texgen.py && python tools/assets/build_catalog.py --check
 # 3. Import (twice: the second pass applies the mobile texture settings)
 godot --headless --path . --import; python tools/assets/tune_imports.py; godot --headless --path . --import
-# 4. Tests, end-to-end smoke test, performance report
+# 4. Tests, end-to-end smoke test, performance report, frame benchmark
 godot --headless --path . --script res://tests/run_tests.gd
 godot --headless --path . --script res://tools/godot/ui_smoke.gd
 godot --headless --path . --script res://tools/godot/perf_report.gd
+#    (with a renderer: per-view frame time, draw calls and triangles per preset)
+godot --path . --rendering-method mobile --resolution 720x1600 --script res://tools/godot/bench_frame.gd -- --stage early --quality 0 --check
 # 5. APK (debug keystore from the Godot editor settings) and its verification
 godot --headless --path . --export-debug Android build/MinerMania3D-debug.apk
 python tools/apk/verify_apk.py build/MinerMania3D-debug.apk --sdk "$ANDROID_HOME"
@@ -81,16 +90,22 @@ arrows and +/- move the camera).
 ## Continuous integration
 
 - **Assets** - builds and validates the asset library when its sources change.
-- **Validate** - scripts, all test suites, the runtime smoke test and a
-  balance report (pull requests; also the first stage of Android).
+- **Validate** - scripts, all test suites, the runtime smoke test (it plays
+  every tutorial tip, scrolls a menu and moves the camera with touch
+  events), render budgets per graphics preset on a software Vulkan
+  renderer at 720x1600, and a balance report (pull requests; also the first
+  stage of Android).
 - **Android** - on every push: validate, export a debug APK, verify it
   and upload it with its reports; then play it on an Android 15 emulator
   with touch input - title screen, new claim, tutorial, camera, pause menu,
   Back key, autosaves, background and resume - failing on any crash, ANR or
-  engine error (report, logcat and screenshots are uploaded). Played: the
-  shipped arm64-v8a APK (through the emulator's ARM translation) on Vulkan
-  and on the OpenGL ES fallback, and its x86_64 twin (same preset and game
-  files, proven identical, native on the emulator) on Vulkan.
+  engine error (report, logcat and screenshots are uploaded); the first
+  launch must pick the Low preset there. Played: the shipped arm64-v8a APK
+  (through the emulator's ARM translation) on the OpenGL ES fallback, and
+  its x86_64 twin (same preset and game files, proven identical, native on
+  the emulator) on Vulkan. Phones run Vulkan with Android frame pacing
+  (Swappy), which the emulator's virtual GPU cannot present with, so the
+  twin turns it off (an x86_64-only project setting override).
 - **Release** - on a `v*` tag: a release-signed APK from repository
   secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
   `ANDROID_KEY_ALIAS`), verified and attached to a GitHub release.

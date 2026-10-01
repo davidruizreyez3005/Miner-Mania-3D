@@ -8,9 +8,11 @@ name: Android
 # checksum-verified official packages, software graphics) and played with
 # real touch input: title screen, new claim, tutorial, camera, pause menu,
 # Back key, autosaves, background/resume - failing on any crash, ANR or
-# engine error. Played: the shipped arm64-v8a APK (through the emulator's
-# ARM translation) on Vulkan and on the OpenGL ES fallback, and its x86_64
-# twin on Vulkan (same preset, native on the emulator;
+# engine error; the first launch must pick the Low graphics preset there.
+# Played: the shipped arm64-v8a APK (through the emulator's ARM
+# translation) on the OpenGL ES fallback, and its x86_64 twin on Vulkan
+# (same preset, native on the emulator, without Android frame pacing, which
+# the emulator's virtual GPU cannot present with;
 # tools/apk/compare_content.py proves every file outside the native
 # libraries is identical to the shipped APK).
 # The debug keystore is created fresh for every run and never stored.
@@ -157,16 +159,14 @@ jobs:
     permissions:
       contents: read
       actions: read
+    # Phones get Android frame pacing (Swappy) on Vulkan; the emulator's
+    # virtual Vulkan GPU cannot present with it, so the Vulkan run uses the
+    # x86_64 twin (pacing off for x86_64 builds, project.godot) and the
+    # shipped APK plays its OpenGL ES path (no Swappy there).
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: shipped arm64-v8a APK, Vulkan
-            key: arm64-vulkan
-            artifact: MinerMania3D-debug-apk
-            apk: MinerMania3D-debug.apk
-            graphics: lavapipe
-            driver: vulkan
           - name: x86_64 twin, Vulkan
             key: x86_64-vulkan
             artifact: MinerMania3D-x86_64-emulator-apk
@@ -216,7 +216,8 @@ jobs:
       - name: Play the game (touch, gameplay, lifecycle)
         run: |
           python3 tools/device/device_smoke.py --apk "build/apk/${{ matrix.apk }}" --sdk "$ANDROID_SDK" \
-            --out build/device --label "${{ matrix.name }}" --expect-driver "${{ matrix.driver }}" --slow 3
+            --out build/device --label "${{ matrix.name }}" --expect-driver "${{ matrix.driver }}" --slow 3 \
+            --expect-graphics Low
 
       - name: Summary
         if: always()

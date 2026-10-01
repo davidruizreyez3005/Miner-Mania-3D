@@ -9,6 +9,8 @@ extends Node3D
 ## which validates bounds, grounding and overlaps.
 
 const NODE_STATES := ["full", "damaged", "depleted"]
+const LAMP_RANGE := 12.5
+const FILL_ENERGY := 1.8
 
 var world: MineWorld
 var d: int
@@ -17,12 +19,18 @@ var env: Dictionary
 var floor_y := 0.0
 var gallery: MeshInstance3D
 var nodes: Array = []             # per slot: {"root": Node3D, "resource", "state", "respawns", "pos"}
-var lights: Array = []
+var lights: Array = []           # the hanging lamps' lights (the preset decides how many shine)
+var fill: OmniLight3D
+var _fill_color := Color.WHITE
+var glow_lights: Array = []
+var on_screen := false
 var pile: Node3D
 var cart: Node3D
 var cart_anim: AnimationPlayer
 var tier_machine: Node3D
 var tier_shown := 0
+var _machine_anims: Array = []
+var _machine_working := -1
 var props_root := Node3D.new()
 var hazard_fx: Array = []
 var _cart_t := 0.0
@@ -55,6 +63,41 @@ func setup(w: MineWorld, depth_index: int) -> void:
 	_build_nodes()
 	_build_hazards()
 	_set_layer(self, Atmosphere.LAYER_UNDERGROUND)
+	# Off screen, the gallery's cosmetics (flicker, cart, drill, hazard
+	# particles) rest.
+	var vis := VisibleOnScreenNotifier3D.new()
+	vis.aabb = AABB(Vector3(-17.0, floor_y - 1.0, -10.5), Vector3(42.0, 10.0, 13.0))
+	vis.screen_entered.connect(_on_screen_changed.bind(true))
+	vis.screen_exited.connect(_on_screen_changed.bind(false))
+	add_child(vis)
+	_on_screen_changed(false)                # until the notifier sees it
+
+
+func _on_screen_changed(now: bool) -> void:
+	on_screen = now
+	for fx in hazard_fx:
+		if is_instance_valid(fx):
+			(fx as GPUParticles3D).emitting = now
+	_machine_working = -1
+
+
+## Graphics preset: how many of the four hanging lamps cast real light (the
+## others only glow; their share goes to a stronger fill light), and the
+## crystal glow lights.
+func apply_quality(p: Dictionary) -> void:
+	var n := clampi(int(p.get("gallery_lamps", lights.size())), 0, lights.size())
+	var step := lights.size() / n if n > 0 else 1
+	for i in lights.size():
+		var l := lights[i] as OmniLight3D
+		l.visible = n > 0 and i % step == 0 and i / step < n
+		l.omni_range = LAMP_RANGE * (1.0 if n >= lights.size() else 1.3)
+	if fill:
+		# Lamps that only glow hand their warmth to the fill light.
+		var missing := float(lights.size() - n) / maxf(1.0, float(lights.size()))
+		fill.light_energy = FILL_ENERGY * (1.0 + 1.2 * missing)
+		fill.light_color = _fill_color.lerp(lamp_color(), 0.55 * missing)
+	for g in glow_lights:
+		(g as Light3D).visible = bool(p.get("crystal_lights", true))
 
 
 func _set_layer(n: Node, layer: int) -> void:
@@ -124,17 +167,18 @@ func _build_lights() -> void:
 		ol.position = Vector3(x, cy - 0.9, z + 0.4)
 		ol.light_color = lamp_color()
 		ol.light_energy = energy
-		ol.omni_range = 12.5
+		ol.omni_range = LAMP_RANGE
 		ol.omni_attenuation = 1.2
 		ol.light_cull_mask = Atmosphere.LAYER_UNDERGROUND
 		ol.shadow_enabled = false
 		add_child(ol)
 		lights.append(ol)
-	var fill := OmniLight3D.new()
+	fill = OmniLight3D.new()
 	fill.name = "Fill"
 	fill.position = Vector3(5.0, floor_y + 3.2, 2.5)
-	fill.light_color = Color(String(env.get("ambient", "#6b5a48"))).lightened(0.3)
-	fill.light_energy = 1.8
+	_fill_color = Color(String(env.get("ambient", "#6b5a48"))).lightened(0.3)
+	fill.light_color = _fill_color
+	fill.light_energy = FILL_ENERGY
 	fill.omni_range = 32.0
 	fill.omni_attenuation = 0.6
 	fill.light_cull_mask = Atmosphere.LAYER_UNDERGROUND
@@ -149,6 +193,7 @@ func _build_lights() -> void:
 			gl.omni_range = 7.0
 			gl.light_cull_mask = Atmosphere.LAYER_UNDERGROUND
 			add_child(gl)
+			glow_lights.append(gl)
 
 
 # ------------------------------------------------------------- structure
@@ -447,10 +492,10 @@ func sync(delta: float) -> void:
 	var dep := world.sim.state.depth(d)
 	# Station pile follows the bin fill.
 	var cap := Economy.station_capacity(world.sim, d)
-	var fill := clampf(Simulation.inv_total(dep["station"]) / maxf(cap, 1e-6), 0.0, 1.0)
-	var target := Vector3.ONE * lerpf(0.15, 1.25, sqrt(fill))
-	pile.scale = pile.scale.lerp(target, clampf(delta * 2.0, 0.0, 1.0))
-	pile.visible = fill > 0.005
+	var bin_fill := clampf(Simulation.inv_total(dep["station"]) / maxf(cap, 1e-6), 0.0, 1.0)
+	var target := Vector3.ONE * lerpf(0.15, 1.25, sqrt(bin_fill))
+	pile.scale = pile.scale.lerp(target, clampf(delta * 2.0, 0.0, 1.0)) if on_screen else target
+	pile.visible = bin_fill > 0.005
 	# Mine cart shuttles between face and station while haulage runs.
 	var hl := int(dep["levels"]["haulage"])
 	var haul: Dictionary = world.sim.rt.get("haul", {}).get(d, {})
@@ -485,6 +530,8 @@ func sync(delta: float) -> void:
 			tier_machine = null
 		var t := world.content.tool_tier(tier)
 		var mid := String(t.get("machine_asset", ""))
+		_machine_anims.clear()
+		_machine_working = -1
 		if mid != "":
 			tier_machine = Assets.instantiate(mid, "", false)
 			var bay: Array = gal().get("machine_bay", [-2.6, -6.2])
@@ -493,16 +540,23 @@ func sync(delta: float) -> void:
 			tier_machine.rotation_degrees.y = 90.0
 			_set_layer(tier_machine, Atmosphere.LAYER_UNDERGROUND)
 			add_child(tier_machine)
-	if tier_machine:
-		var working := world.sim.crew("depth:%d" % d, "miner") > 0.0
-		for ap in tier_machine.find_children("*", "AnimationPlayer", true, false):
+			_machine_anims = tier_machine.find_children("*", "AnimationPlayer", true, false)
+	if not on_screen:
+		for a in _machine_anims:
+			(a as AnimationPlayer).pause()
+		return
+	var working := 1 if world.sim.crew("depth:%d" % d, "miner") > 0.0 else 0
+	if working != _machine_working:
+		_machine_working = working
+		for ap in _machine_anims:
 			var a := ap as AnimationPlayer
-			var want := "Dig" if a.has_animation("Dig") else "Work"
-			want = want if working else "Idle"
-			if a.current_animation != want and a.has_animation(want):
+			var want := ("Dig" if a.has_animation("Dig") else "Work") if working == 1 else "Idle"
+			if a.has_animation(want):
 				a.play(want, 0.5)
 	# Subtle lamp flicker.
 	_flicker_t += delta
+	var energy := float(env.get("lamp_energy", 2.2)) * 1.5
 	for i in lights.size():
 		var l := lights[i] as OmniLight3D
-		l.light_energy = float(env.get("lamp_energy", 2.2)) * 1.5 * (0.93 + 0.07 * sin(_flicker_t * (3.1 + i) + i * 1.7))
+		if l.visible:
+			l.light_energy = energy * (0.93 + 0.07 * sin(_flicker_t * (3.1 + i) + i * 1.7))

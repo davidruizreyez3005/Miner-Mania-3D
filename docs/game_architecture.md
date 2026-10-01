@@ -182,6 +182,20 @@ more, pause; popups: WHILE YOU WERE AWAY, discoveries, confirmations. Toasts,
 floating "+ore" texts and the tutorial coach complete it. Features appear as
 the game introduces them.
 
+Every panel's list is a `TouchScroll`: a drag scrolls it wherever the finger
+lands. Godot only scrolls a ScrollContainer by touch when the drag reaches
+it, so the buttons, cards, bars and icons inside let pointer events pass up;
+a tap still presses a button, and a drag past the dead zone cancels the
+press and scrolls instead (sliders keep their drags).
+
+The tutorial (`data/tutorial.json`, `TutorialOverlay`) shows one tip at a
+time with a Next button and a marker on what to touch - a HUD button, the
+control inside an open panel (scrolled into view), a vein or a gallery. A
+tip completes on its game event, as soon as its `done_when` objectives hold
+in the simulation (so an action done early, or from a full-screen panel that
+hides the card, still counts), or with Next. A claim starts with enough
+money for the first miner and the first upgrade the tips ask for.
+
 ## Audio and effects
 
 Sounds are synthesised by `tools/audio/synth.py` (43 effects, music and
@@ -194,18 +208,58 @@ dust, discovery bursts, steam, drips, exhaust, motes).
 
 ## Performance
 
-Budgets live in `data/performance.json` and are checked by the tests and by
-`tools/godot/perf_report.gd`. A late-game mine (all 8 depths, every
-facility, ~80 workers) measures about 0.8 ms per simulation tick and 2 ms per
-frame for world and agent updates on the build machine; views draw 170-330
-calls and ~0.75 M triangles with ~100 MB of texture memory. Mobile specifics:
-VRAM-compressed textures capped at 1024/512 px, Godot mesh LOD instead of
-pipeline LOD models, crew LOD characters, MultiMesh batching for dressing,
-visibility ranges, animation throttling, threaded model preloading, and a
-30/60 fps setting. Android frame pacing (Swappy) is off: on the emulator's
-virtual Vulkan GPU the first present after Swappy starts fails and the
-render loop stalls, while Godot's standard presentation works on Vulkan and
-OpenGL ES alike.
+Budgets live in `data/performance.json` and are checked by the tests,
+`tools/godot/perf_report.gd` (CPU side, late-game mine) and
+`tools/godot/bench_frame.gd` (the real game drawn by a real renderer: frame
+time, draw calls and triangles per camera view, per graphics preset, for a
+claim early, mid or late in the game). A late-game mine (all 8 depths, every
+facility, ~80 workers) costs about 0.8 ms per simulation tick and 1-2 ms per
+frame for world and agent updates on the build machine.
+
+Graphics presets (`GraphicsQuality`, data in `performance.json` under
+`graphics`; Low also drops the fog's aerial perspective and sky
+reflections):
+
+| | Low | Medium | High |
+| --- | --- | --- | --- |
+| 3D resolution | 60 % | 80 % | 100 % |
+| MSAA / anisotropic filtering | off / off | off / 2x | 2x / 4x |
+| Sun shadows / glow | off / off | on (1024, 55 m) / off | on (2048, 90 m) / on |
+| Terrain, rock, models | one-texture shaders, per-vertex lighting, no normal/roughness/metal/AO maps | full | full |
+| Gallery lamps with real light | 0 of 4 (warm fill instead) | 2 | 4 |
+| Scenery drawn / grass / its shadows | 35 % / no / no | 70 % / yes / no | all / yes / yes |
+| Crew rigs at full animation rate | 8 | 16 | 28 |
+| Frame cap | 30 fps | 60 fps | 60 fps |
+
+The first launch picks a preset for the device (`Settings` and
+`GraphicsQuality.detect`): Low on the OpenGL ES fallback, under 4.5 GB of
+memory or with an entry-level GPU (Mali-G31..G57, Mali-T, PowerVR, Adreno
+3xx-61x), High for a flagship GPU with 7.5 GB or more, Medium otherwise.
+While the choice is automatic, `FrameWatchdog` measures the frame rate in
+play and steps down a level when it stays under 80 % of the cap; a quality
+the player picks sticks. Presets apply live: the viewport (3D scale, MSAA,
+anisotropy, mesh LOD detail, shadow atlas), `WorldMaterials` and
+`MaterialLite` (shader and material features), and `MineWorld.apply_quality`
+(lights, scenery, crew detail, effects, camera reach).
+
+Always on: the sun only casts shadows from surface geometry (the galleries
+underneath never enter its shadow map); scenery is batched per 24 m patch so
+patches off screen are culled and far ones use lower automatic mesh LODs;
+galleries off screen rest (lamp flicker, cart, drill animation, hazard
+particles); VRAM-compressed textures capped at 1024/512 px, crew LOD
+characters, MultiMesh batching, visibility ranges, animation throttling and
+threaded model preloading. Measured with `bench_frame.gd` on Mesa's
+software Vulkan at 720x1600 (a stand-in for a weak GPU: costs compare, the
+absolute times do not), a new claim's frame now costs 55 ms on Low against
+327 ms for the previous Low preset and about 395 ms for the previous default
+(Medium); Medium dropped to 225 ms, High is unchanged. Low draws 110-130
+calls and 80-115 k triangles per view early in the game, 115-235 calls and
+115-225 k triangles with 70 workers and five depths.
+
+Android frame pacing (Swappy) is on for phones: it keeps frames evenly
+spaced at the 30 fps cap and on 90/120 Hz screens. The emulator's virtual
+Vulkan GPU cannot present with it, so x86_64 builds - only the emulator
+test twin - turn it off with a feature override in `project.godot`.
 
 ## Testing
 
@@ -216,19 +270,27 @@ accuracy, reports), progression (quests, achievements, contracts,
 prestige, determinism), saves (round trip, migration, corruption,
 checksums, timestamps), balance (pacing), game state (transitions) and world
 (module definitions, camp layout, full-world placement, navigation, cage
-routes, agents, the foreman, triangle budgets). `tools/godot/ui_smoke.gd`
-boots the real game and plays it end to end, including memory checks
-(opening every panel repeatedly and going into the mine and back must not
-leave objects behind).
+routes, agents, the foreman and taps queued on his way, camera drag
+directions, triangle budgets) and graphics (presets, device detection, the
+world following a preset and back, the player's choice, the watchdog).
+`tools/godot/ui_smoke.gd` boots the real game and plays it end to end with
+touch events - every tutorial tip (Next, taps on the vein, LIFT, SELL and
+the controls the marker points at), a menu scrolled by a finger drag, camera
+drags on the surface and underground and a two-finger twist that must not
+turn it, live preset switches - including memory checks (opening every
+panel repeatedly and going into the mine and back must not leave objects
+behind).
 
 `tools/device/device_smoke.py` plays the exported APK on an Android device
 or emulator with real touch input through adb, following the game's log
 lines (`[boot]`, `[state] A -> B`, `[save] ...`): title, new claim,
 tutorial, camera pan (the picture must change), pause menu, Back key,
 autosaves with the claim clock advancing, background and resume in the same
-process, and no crash, ANR or engine error. CI runs it on an Android 15
-x86_64 emulator with software graphics: the shipped arm64-v8a APK (through
-the image's ARM translation) on Vulkan and on the OpenGL ES fallback (the
+process, the graphics preset the first launch picked, and no crash, ANR or
+engine error. CI runs it on an Android 15 x86_64 emulator (4 GB, software
+graphics - the first launch must pick Low): the shipped arm64-v8a APK
+(through the image's ARM translation) on the OpenGL ES fallback (the
 emulator without Vulkan), and an x86_64 twin exported from a copy of the
 same preset - `tools/apk/compare_content.py` proves it identical apart from
-the engine's native library - on Vulkan.
+the engine's native library - on Vulkan, where the twin runs without frame
+pacing.

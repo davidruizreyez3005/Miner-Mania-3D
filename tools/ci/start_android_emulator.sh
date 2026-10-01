@@ -10,7 +10,8 @@
 # graphics (software - CI runners have no GPU):
 #   lavapipe  Vulkan through the emulator's virtual GPU on Mesa lavapipe
 #             (default). Apps using Android frame pacing (Swappy) fail to
-#             present there; the game ships with it off.
+#             present there; the game turns it off for x86_64 builds (the
+#             emulator test twin) and keeps it for phones.
 #   gles      no Vulkan in the guest, so apps take their OpenGL ES path
 #             (GLES through ANGLE on the same software backend).
 # Needs /dev/kvm (hardware acceleration). Prints the device serial.

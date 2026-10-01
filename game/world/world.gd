@@ -11,6 +11,7 @@ signal facilities_changed
 
 const PICK_LAYER := 1 << 1        # physics layer for tap targets (veins, workers, buildings)
 const PICK_AREA_LAYER := 1 << 2   # large tap areas (whole galleries), picked last
+const DECOR_CELL := 24.0          # scenery batches cover this many metres square
 
 var sim: Simulation
 var content: ContentDB
@@ -28,6 +29,7 @@ var modules: ModuleLibrary
 var placements: Array = []               # validated placement records (see ModuleLibrary)
 var agents: AgentManager
 var decor_obstacles: Array = []          # [centre xz, half xz] of decor inside the camp (agents avoid them)
+var decor: Array = []                    # {"mmi", "kind", "count", "shadow", "range"}: scenery the presets thin out
 var surface_seats: Array = []            # Transform3D of bench seats at the surface rest area
 var _face_mesh: MeshInstance3D
 var _shaft_mesh: MeshInstance3D
@@ -63,6 +65,7 @@ func begin(s: Simulation) -> void:
 	atmosphere = Atmosphere.new()
 	add_child(atmosphere)
 	atmosphere.setup(content.region_by_id.get(sim.state.region, content.regions[0]))
+	EventBus.quality_changed.connect(apply_quality)
 
 
 ## [label, Callable] build steps in order.
@@ -78,6 +81,7 @@ func steps() -> Array:
 		["Calling the crews", _build_agents],
 		["Lighting the lamps", func() -> void:
 			built = true
+			apply_quality(GraphicsQuality.current())
 			sync(0.0)],
 	]
 
@@ -277,6 +281,7 @@ func _build_rock() -> void:
 			var dv := DepthView.new()
 			mine_root.add_child(dv)
 			dv.setup(self, int(d))
+			dv.apply_quality(GraphicsQuality.preset(GraphicsQuality.current()))
 			depth_views[d] = dv
 	for d in range(1, content.depth_count() + 1):
 		if not d in unlocked and not depth_views.has(-d):
@@ -299,6 +304,7 @@ func _build_shaft_lights(unlocked: Array) -> void:
 		ol.light_energy = 1.4
 		ol.omni_range = 9.0
 		ol.light_cull_mask = Atmosphere.LAYER_UNDERGROUND
+		ol.visible = bool(GraphicsQuality.current_value("shaft_lights", true))
 		mine_root.add_child(ol)
 		_shaft_lights.append(ol)
 
@@ -346,12 +352,12 @@ func _build_decor() -> void:
 			var rid: String = ["env_rock_small_01", "env_rock_medium_01", "env_rock_large_01", "env_boulder_01"][_rng.randi_range(0, 3)]
 			(rocks.get_or_add(rid, []) as Array).append(t)
 	for tid in trees:
-		Scatter.place(decor_root, tid, trees[tid], Atmosphere.LAYER_SURFACE, true, 150.0)
+		_add_decor(tid, trees[tid], "tree", true, 150.0)
 	if "env_bush_01" in Assets.assets:
-		Scatter.place(decor_root, "env_bush_01", bushes, Atmosphere.LAYER_SURFACE, false, 70.0)
-	Scatter.place(decor_root, "env_grass_clump_01", grass, Atmosphere.LAYER_SURFACE, false, 45.0)
+		_add_decor("env_bush_01", bushes, "bush", false, 70.0)
+	_add_decor("env_grass_clump_01", grass, "grass", false, 45.0)
 	for rid in rocks:
-		Scatter.place(decor_root, rid, rocks[rid], Atmosphere.LAYER_SURFACE, true, 110.0)
+		_add_decor(rid, rocks[rid], "rock", true, 110.0)
 	# Cliff line along the foot of the hills behind the camp.
 	var cliffs := []
 	var x2 := tb.x_range.x + 6.0
@@ -359,7 +365,44 @@ func _build_decor() -> void:
 		var z2 := -50.0 + 2.5 * sin(x2 * 0.13)
 		cliffs.append(Transform3D(Basis(Vector3.UP, deg_to_rad(_rng.randf_range(-4.0, 4.0))), Vector3(x2, tb.height(x2, z2 + 1.5) - 0.3, z2)))
 		x2 += 5.8
-	Scatter.place(decor_root, "env_cliff_01", cliffs, Atmosphere.LAYER_SURFACE, true, 160.0)
+	_add_decor("env_cliff_01", cliffs, "cliff", true, 160.0, 36.0)
+
+
+func _add_decor(asset_id: String, transforms: Array, kind: String, shadow: bool, reach: float, cell: float = DECOR_CELL) -> void:
+	for m in Scatter.place(decor_root, asset_id, transforms, Atmosphere.LAYER_SURFACE, shadow, reach, cell):
+		decor.append({"mmi": m, "kind": kind, "count": (m as MultiMeshInstance3D).multimesh.instance_count, "shadow": shadow, "range": reach})
+
+
+## Graphics preset (Settings > Graphics, or the automatic choice): sun
+## shadows and glow, real lamp lights, how much scenery is drawn and how far,
+## whether it casts shadows, and the crews' animation detail. Materials and
+## the viewport follow the preset in Settings.
+func apply_quality(q: int) -> void:
+	var p := GraphicsQuality.preset(q)
+	atmosphere.apply_quality(q)
+	for l in _shaft_lights:
+		(l as Light3D).visible = bool(p.get("shaft_lights", true))
+	for d in depth_views:
+		(depth_views[d] as DepthView).apply_quality(p)
+	var density := clampf(float(p.get("decor_density", 1.0)), 0.0, 1.0)
+	var reach := clampf(float(p.get("detail_scale", 1.0)), 0.3, 1.0)
+	for item in decor:
+		var mmi: MultiMeshInstance3D = item["mmi"]
+		if not is_instance_valid(mmi):
+			continue
+		var kind := String(item["kind"])
+		var keep := 1.0 if kind == "cliff" else density
+		if kind == "grass" and not bool(p.get("grass", true)):
+			keep = 0.0
+		var count := int(item["count"])
+		var n := mini(count, ceili(float(count) * keep))
+		mmi.multimesh.visible_instance_count = -1 if n >= count else n
+		mmi.visible = n > 0
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if bool(item["shadow"]) and bool(p.get("decor_shadows", true)) \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = float(item["range"]) * (1.0 if kind == "cliff" else reach)
+	if agents:
+		agents.apply_quality(p)
 
 
 func _blocked(p: Vector2, margin: float) -> bool:

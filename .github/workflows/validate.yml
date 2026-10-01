@@ -39,27 +39,52 @@ jobs:
         run: python tools/assets/export_filter.py --check
 
       - name: Compile every script
+        timeout-minutes: 15
         run: |
           "$GODOT" --headless --path . --script res://tools/godot/check_scripts.gd 2>&1 | tee build/check_scripts.log
           grep -q ", 0 failed" build/check_scripts.log
 
       - name: Automated tests
+        timeout-minutes: 30
         run: |
           mkdir -p build/test-results
           "$GODOT" --headless --path . --script res://tests/run_tests.gd -- \
             --junit build/test-results/junit.xml --json build/test-results/results.json 2>&1 | tee build/test-results/tests.log
 
       - name: Runtime smoke test (boots the real game, plays, opens every screen)
+        timeout-minutes: 25
         run: |
           "$GODOT" --headless --path . --script res://tools/godot/ui_smoke.gd -- \
             --report build/test-results/ui_smoke.json 2>&1 | tee build/test-results/ui_smoke.log
 
       - name: Performance budgets (late-game mine, CPU side)
+        timeout-minutes: 20
         run: |
           "$GODOT" --headless --path . --script res://tools/godot/perf_report.gd -- \
             --json build/test-results/perf.json 2>&1 | tail -n 40 | tee build/test-results/perf.log
 
+      # The real game drawn by a real renderer (Mesa's software Vulkan at a
+      # phone's 720x1600): draw calls and triangles per view must stay within
+      # each preset's budget (data/performance.json); frame times are logged.
+      - name: Render budgets per graphics preset (software Vulkan, 720x1600)
+        timeout-minutes: 45
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mesa-vulkan-drivers xvfb > /dev/null
+          icd=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1)
+          for run in "early 0" "early 2" "mid 0"; do
+            set -- $run
+            VK_ICD_FILENAMES="$icd" xvfb-run -a -s "-screen 0 800x1700x24" "$GODOT" --path . \
+              --rendering-method mobile --rendering-driver vulkan --resolution 720x1600 \
+              --script res://tools/godot/bench_frame.gd -- --stage "$1" --quality "$2" --frames 24 --check \
+              --json "build/test-results/render_$1_q$2.json" > "build/test-results/render_$1_q$2.log" 2>&1 \
+              && rc=0 || rc=$?
+            grep -h "^bench_frame:" "build/test-results/render_$1_q$2.log" || tail -n 30 "build/test-results/render_$1_q$2.log"
+            test "$rc" -eq 0
+          done
+
       - name: Balance report (6 simulated hours)
+        timeout-minutes: 30
         run: |
           "$GODOT" --headless --path . --script res://tools/godot/balance_report.gd -- \
             --hours 6 --json build/test-results/balance.json 2>&1 | tail -n 60 | tee build/test-results/balance.log
@@ -74,6 +99,7 @@ jobs:
             grep -h "^check_scripts:" build/check_scripts.log 2>/dev/null | sed 's/^/- /'
             grep -h "tests, .* passed" build/test-results/tests.log 2>/dev/null | sed 's/^/- /'
             grep -h "^ui_smoke:" build/test-results/ui_smoke.log 2>/dev/null | sed 's/^/- /'
+            grep -h "^bench_frame:" build/test-results/render_*.log 2>/dev/null | sed 's/^/- /'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results

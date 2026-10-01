@@ -156,6 +156,7 @@ func instantiate(id: String, state: String = "", lod: bool = true) -> Node3D:
 			root.add_child(li)
 			var end: float = LOD_DISTANCES[i + 1] if i + 1 < LOD_DISTANCES.size() and i + 1 < lods.size() else 0.0
 			_set_range(li, LOD_DISTANCES[i], end)
+	MaterialLite.track(root)
 	return root
 
 

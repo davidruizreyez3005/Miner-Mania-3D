@@ -48,6 +48,8 @@ func setup(aid: String, lod: int = 0) -> void:
 	model = _lod_model(aid, lod)
 	if model == null:
 		model = Assets.instantiate(aid, "", false)
+	else:
+		MaterialLite.track(model)
 	add_child(model)
 	var aps := model.find_children("*", "AnimationPlayer", true, false)
 	if not aps.is_empty():

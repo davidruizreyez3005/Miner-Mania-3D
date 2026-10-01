@@ -10,6 +10,17 @@ const MAX_POOL := 6
 static var _pools: Dictionary = {}      # effect id -> Array[GPUParticles3D]
 static var _soft: GradientTexture2D
 static var _materials: Dictionary = {}
+static var amount_scale := 1.0           # graphics preset ("vfx"): share of each effect's particles
+
+
+## Graphics preset: fewer particles per effect (transparent overdraw is
+## costly on small GPUs). Applies to effects made from now on.
+static func set_amount_scale(v: float) -> void:
+	amount_scale = clampf(v, 0.1, 1.0)
+	for pool in _pools.values():
+		for p in pool:
+			if is_instance_valid(p):
+				(p as GPUParticles3D).amount_ratio = amount_scale
 
 
 static func _soft_tex() -> GradientTexture2D:
@@ -65,6 +76,7 @@ static func make(effect: String, tint: Color = Color(0, 0, 0, 0)) -> GPUParticle
 	var p := GPUParticles3D.new()
 	p.name = "Vfx_" + effect
 	p.amount = int(d["amount"])
+	p.amount_ratio = amount_scale
 	p.lifetime = float(d["life"])
 	p.one_shot = bool(d["one_shot"])
 	p.explosiveness = 0.9 if p.one_shot else 0.0

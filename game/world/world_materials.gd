@@ -2,14 +2,53 @@ class_name WorldMaterials
 extends RefCounted
 ## Materials for procedural world geometry (terrain, rock, structures), built
 ## from the generated tiling texture sets (tools/textures/texgen.py) and the
-## per-region / per-depth colours in the data files. Cached per key.
+## per-region / per-depth colours in the data files. Cached per key. The Low
+## preset swaps the terrain and rock shaders for one-texture versions
+## (set_lite) and strips the structures' extra maps (MaterialLite).
 
 const TEX := "res://assets/generated/textures/%s_%s.png"
 const ROCK_SHADER := preload("res://game/world/shaders/rock.gdshader")
+const ROCK_LITE_SHADER := preload("res://game/world/shaders/rock_lite.gdshader")
 const TERRAIN_SHADER := preload("res://game/world/shaders/terrain.gdshader")
+const TERRAIN_LITE_SHADER := preload("res://game/world/shaders/terrain_lite.gdshader")
 
+static var lite := false
 static var _cache: Dictionary = {}
 static var _tex: Dictionary = {}
+
+
+## Entry-level shaders on or off for every world material made so far and
+## from now on.
+static func set_lite(on: bool) -> void:
+	lite = on
+	for m in _cache.values():
+		if m is ShaderMaterial:
+			_use_shader(m as ShaderMaterial)
+
+
+## Remembers a shader material's full / lite shader pair and its parameters
+## (the lite shader has fewer uniforms; switching back restores them all).
+static func _register(m: ShaderMaterial, full: Shader, lite_shader: Shader) -> ShaderMaterial:
+	var params := {}
+	for u in full.get_shader_uniform_list():
+		params[String(u["name"])] = m.get_shader_parameter(String(u["name"]))
+	m.set_meta("mm_shaders", [full, lite_shader])
+	m.set_meta("mm_params", params)
+	_use_shader(m)
+	return m
+
+
+static func _use_shader(m: ShaderMaterial) -> void:
+	var pair: Array = m.get_meta("mm_shaders", [])
+	if pair.is_empty():
+		return
+	var want: Shader = pair[1] if lite else pair[0]
+	if m.shader == want:
+		return
+	m.shader = want
+	var params: Dictionary = m.get_meta("mm_params", {})
+	for k in params:
+		m.set_shader_parameter(k, params[k])
 
 
 static func tex(set_name: String, kind: String) -> Texture2D:
@@ -39,7 +78,7 @@ static func rock(depth_def: Dictionary) -> ShaderMaterial:
 	if glow != "":
 		m.set_shader_parameter("glow_color", Color(glow))
 		m.set_shader_parameter("glow_strength", 2.2)
-	_cache[key] = m
+	_cache[key] = _register(m, ROCK_SHADER, ROCK_LITE_SHADER)
 	return m
 
 
@@ -58,7 +97,7 @@ static func face() -> ShaderMaterial:
 	m.set_shader_parameter("rock_tint", Color(1.05, 1.0, 0.95))
 	m.set_shader_parameter("strata_tint", Color(1.08, 1.0, 0.92))
 	m.set_shader_parameter("strata_amount", 1.0)
-	_cache["face"] = m
+	_cache["face"] = _register(m, ROCK_SHADER, ROCK_LITE_SHADER)
 	return m
 
 
@@ -77,7 +116,7 @@ static func terrain(region: Dictionary) -> ShaderMaterial:
 	m.set_shader_parameter("rock_tint", _tint(String(look.get("cliff", "#8c7a64")), 1.6))
 	m.set_shader_parameter("dirt_tint", _tint(String(look.get("terrain", "#7a6a55")), 1.5))
 	m.set_shader_parameter("snow_amount", 0.85 if region.get("id", "") == "frostpeak_glacier" else 0.0)
-	_cache[key] = m
+	_cache[key] = _register(m, TERRAIN_SHADER, TERRAIN_LITE_SHADER)
 	return m
 
 
@@ -96,6 +135,7 @@ static func structure(kind: String) -> StandardMaterial3D:
 	m.uv1_scale = Vector3.ONE * 0.5
 	m.metallic = 0.3 if kind == "steel" else 0.0
 	_cache[key] = m
+	MaterialLite.track_material(m, true)
 	return m
 
 

@@ -18,6 +18,8 @@ var _tool_button: CostButton
 var _tool_label: Label
 var _hire: Dictionary = {}        # role -> {"label": Label, "button": CostButton}
 var _veins: VBoxContainer
+var _veins_sig := ""
+var _vein_rows: Array = []
 var _unlock_button: CostButton
 
 
@@ -123,6 +125,7 @@ func build() -> void:
 		anchor("depth_hire_%s" % role, hb)
 	section("Veins")
 	_veins = UiKit.vbox(8)
+	_veins_sig = ""
 	content.add_child(_veins)
 
 
@@ -243,22 +246,46 @@ func refresh() -> void:
 	_refresh_veins(s, dep)
 
 
+## Vein rows are rebuilt only when the veins change (resource or state);
+## otherwise their bars and timers update in place (a rebuild every refresh
+## re-lays out text, which a small phone feels).
 func _refresh_veins(s: Simulation, dep: Dictionary) -> void:
-	UiKit.clear(_veins)
+	var sig := ""
 	for n in dep["nodes"]:
-		var r: Dictionary = s.content.resource_by_id.get(String(n["resource"]), {})
-		var h := UiKit.hbox(10)
-		h.add_child(Icon.make("gem", 38, UiTheme.TEXT, Color(String(r.get("color", "#cccccc")))))
-		var v := UiKit.vbox(2)
-		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var rar := String(r.get("rarity", "common"))
-		var nl := UiKit.label("%s  -  %s" % [String(r.get("name", n["resource"])), String(UiText.RARITY_NAMES.get(rar, rar))], "Small")
-		nl.add_theme_color_override("font_color", UiTheme.RARITY.get(rar, UiTheme.TEXT))
-		v.add_child(nl)
-		if float(n["respawn_at"]) >= 0.0:
-			v.add_child(UiKit.label("Regrowing  %s" % Num.duration(float(n["respawn_at"]) - s.state.run_time), "Caption"))
-		else:
-			v.add_child(UiKit.progress(float(n["hp"]), float(n["max_hp"]), "GreenBar", 12))
-		h.add_child(v)
-		h.add_child(UiKit.label(Num.money(Economy.item_price(s, String(n["resource"]))), "Caption"))
-		_veins.add_child(h)
+		sig += "%s:%s|" % [n["resource"], float(n["respawn_at"]) >= 0.0]
+	if sig != _veins_sig:
+		_veins_sig = sig
+		_vein_rows.clear()
+		UiKit.clear(_veins)
+		for n in dep["nodes"]:
+			var r: Dictionary = s.content.resource_by_id.get(String(n["resource"]), {})
+			var h := UiKit.hbox(10)
+			h.add_child(Icon.make("gem", 38, UiTheme.TEXT, Color(String(r.get("color", "#cccccc")))))
+			var v := UiKit.vbox(2)
+			v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var rar := String(r.get("rarity", "common"))
+			var nl := UiKit.label("%s  -  %s" % [String(r.get("name", n["resource"])), String(UiText.RARITY_NAMES.get(rar, rar))], "Small")
+			nl.add_theme_color_override("font_color", UiTheme.RARITY.get(rar, UiTheme.TEXT))
+			v.add_child(nl)
+			var timer: Label = null
+			var bar: ProgressBar = null
+			if float(n["respawn_at"]) >= 0.0:
+				timer = UiKit.label("", "Caption")
+				v.add_child(timer)
+			else:
+				bar = UiKit.progress(0.0, float(n["max_hp"]), "GreenBar", 12)
+				v.add_child(bar)
+			h.add_child(v)
+			var price := UiKit.label("", "Caption")
+			h.add_child(price)
+			_veins.add_child(h)
+			_vein_rows.append({"timer": timer, "bar": bar, "price": price})
+	for i in mini(_vein_rows.size(), dep["nodes"].size()):
+		var n: Dictionary = dep["nodes"][i]
+		var row: Dictionary = _vein_rows[i]
+		if row["timer"] != null:
+			(row["timer"] as Label).text = "Regrowing  %s" % Num.duration(float(n["respawn_at"]) - s.state.run_time)
+		if row["bar"] != null:
+			(row["bar"] as ProgressBar).max_value = maxf(float(n["max_hp"]), 1e-6)
+			(row["bar"] as ProgressBar).value = float(n["hp"])
+		(row["price"] as Label).text = Num.money(Economy.item_price(s, String(n["resource"])))
