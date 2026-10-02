@@ -24,6 +24,8 @@ func _full_sim() -> Simulation:
 	sim.invalidate_modifiers()
 	for d in range(1, content().depth_count() + 1):
 		sim.unlock_depth_internal(d)
+	for q in content().quest_by_id:
+		sim.state.quests[q] = "claimed"             # every role unlocked (haulers, supervisors, engineers)
 	for f in content().facility_by_id:
 		sim.execute({"type": "build", "facility": f})
 		sim.execute({"type": "upgrade", "facility": f, "count": 1000})
@@ -150,6 +152,122 @@ func test_mechanic_walks_between_machines() -> void:
 				spots.append(p)
 	assert_ge(float(worked.size()), 3.0, "worked at several stops: %s" % str(worked.keys()))
 	assert_ge(float(spots.size()), 3.0, "stood at several places across the camp (%d)" % spots.size())
+
+
+func test_haulers_carry_ore() -> void:
+	## Haulers walk the face <-> station loop with a sack - they used to
+	## stand at the rest corner with nothing to do.
+	var w := _world_full()
+	var hauler: WorkerAgent = null
+	for a in w.agents.agents.values():
+		if (a as WorkerAgent).role == "hauler":
+			hauler = a
+	if not assert_true(hauler != null, "a hauler agent exists"):
+		return
+	var carried := false
+	var empty := false
+	var lo := INF
+	var hi := -INF
+	for i in 1500:
+		w.sim.tick(0.1)
+		w.sync(0.1)
+		if hauler.activity == "haul":
+			carried = carried or hauler.carrying
+			empty = empty or not hauler.carrying
+			lo = minf(lo, hauler.position.x)
+			hi = maxf(hi, hauler.position.x)
+	assert_true(carried and empty, "the hauler alternates carrying a sack and walking back (carried %s, empty %s)" % [carried, empty])
+	assert_gt(hi - lo, 8.0, "it walks between the face and the station (%.1f m)" % (hi - lo))
+
+
+## The smallest gap between two trucks' footprints over `ticks` (m, 0 when
+## they touch or overlap); `left` marks the trucks that went out.
+var closest_info := ""
+
+
+func _closest_trucks(w: MineWorld, ticks: int, left: Array) -> float:
+	var sv := w.sales_view
+	var closest := INF
+	for i in ticks:
+		w.sim.tick(0.1)
+		w.sync(0.1)
+		var feet: Array = []
+		for t in sv.trucks:
+			feet.append(_footprint(t["node"], sv.model))
+			if t["state"] == "out":
+				left[sv.trucks.find(t)] = true
+		for a in feet.size():
+			for b in range(a + 1, feet.size()):
+				var g := _poly_gap(feet[a], feet[b])
+				if g < closest:
+					closest = g
+					var pa: Vector3 = sv.trucks[a]["node"].global_position
+					var pb: Vector3 = sv.trucks[b]["node"].global_position
+					closest_info = "tick %d: truck %d %s at (%.1f, %.1f), truck %d %s at (%.1f, %.1f)" % [i, a, sv.trucks[a]["state"], pa.x, pa.z,
+						b, sv.trucks[b]["state"], pb.x, pb.z]
+	return closest
+
+
+## A truck's footprint on the ground (xz) as it is drawn.
+func _footprint(node: Node3D, model: String) -> PackedVector2Array:
+	var bb := Assets.bounds(model)
+	var out := PackedVector2Array()
+	for c in [Vector2(bb.position.x, bb.position.z), Vector2(bb.end.x, bb.position.z), Vector2(bb.end.x, bb.end.z), Vector2(bb.position.x, bb.end.z)]:
+		var p := node.global_transform * Vector3(c.x, 0.0, c.y)
+		out.append(Vector2(p.x, p.z))
+	return out
+
+
+static func _poly_gap(a: PackedVector2Array, b: PackedVector2Array) -> float:
+	if a[0].distance_to(b[0]) > 16.0:
+		return INF
+	if not Geometry2D.intersect_polygons(a, b).is_empty():
+		return 0.0
+	var best := INF
+	for k in 2:
+		var p := a if k == 0 else b
+		var q := b if k == 0 else a
+		for v in p:
+			for i in q.size():
+				best = minf(best, v.distance_to(Geometry2D.get_closest_point_to_segment(v, q[i], q[(i + 1) % q.size()])))
+	return best
+
+
+func test_trucks_keep_their_distance() -> void:
+	## Every truck has its own bay and they leave one after another: they never
+	## drive or park inside each other - passing on the other lane, pulling out
+	## across it or reversing into their bays - also when SELL sends them out
+	## by hand.
+	var w := _world_full()
+	var sv := w.sales_view
+	var bays := SiteLayout.truck_bays(w.layout)
+	w.sim.tick(0.1)
+	w.sync(0.1)                                       # the fleet follows the depot level
+	assert_eq(sv.trucks.size(), mini(4, bays.size()), "a full fleet at the top depot level")
+	var left := [false, false, false, false]
+	w.sim.state.warehouse = {"stone": 1e9}
+	var auto_gap := _closest_trucks(w, 900, left)
+	assert_gt(auto_gap, 0.15, "automatic sales: trucks keep apart (closest %.2f m, %s)" % [auto_gap, closest_info])
+	assert_eq(left.count(true), sv.trucks.size(), "every truck drives: %s" % str(left))
+	# By hand: without the dispatch research the trucks wait for SELL.
+	w.sim.state.techs.erase("automated_dispatch")
+	w.sim.invalidate_modifiers()
+	w.sim.state.warehouse = {"stone": 1e9}
+	left = [false, false, false, false]
+	_closest_trucks(w, 400, left)                     # trucks out on the auto sale come home
+	left = [false, false, false, false]
+	for k in 3:
+		assert_ok(w.sim.execute({"type": "dispatch"}))
+	var manual_gap := _closest_trucks(w, 700, left)
+	assert_gt(manual_gap, 0.15, "SELL: trucks keep apart (closest %.2f m, %s)" % [manual_gap, closest_info])
+	assert_eq(left.count(true), sv.trucks.size(), "SELL sends every truck out in turn: %s" % str(left))
+	_closest_trucks(w, 300, [false, false, false, false])
+	for i in sv.trucks.size():
+		var p: Vector3 = sv.truck_positions()[i]
+		var bay: Vector3 = bays[i]
+		assert_lt(Vector2(p.x, p.z).distance_to(Vector2(bay.x, bay.z)), 0.5, "truck %d parks in its own bay" % i)
+	w.sim.state.techs["automated_dispatch"] = true
+	w.sim.invalidate_modifiers()
 
 
 func test_agents_follow_simulation() -> void:

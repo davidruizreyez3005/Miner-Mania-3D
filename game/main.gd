@@ -153,6 +153,7 @@ func _show_menu() -> void:
 	var has_save := SaveService.has_save()
 	if has_save:
 		v.add_child(UiKit.button("Continue", func() -> void: _start("continue"), "Primary", 110))
+		_log_save()
 	v.add_child(UiKit.button("New claim" if has_save else "Start mining", func() -> void:
 		if has_save:
 			ui.open_panel("confirm", {"text": "Start a brand-new claim? Your current mine, legacy and achievements will be erased.",
@@ -167,6 +168,17 @@ func _show_menu() -> void:
 	_show_screen(c, true)
 	Audio.set_music("surface")
 	Audio.set_ambience("surface")
+
+
+## The saved claim the title offers to continue (the device test reads it
+## to prove a save survives installing an update over the game).
+func _log_save() -> void:
+	var r := SaveService.read()
+	if r.get("ok", false):
+		var st: SimState = r["state"]
+		print("[title] save: claim time %.0f s, money %.0f" % [st.run_time, st.money])
+	else:
+		print("[title] save unreadable: %s" % String(r.get("detail", r.get("error", "?"))))
 
 
 func _start(mode: String) -> void:

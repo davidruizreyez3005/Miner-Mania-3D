@@ -31,6 +31,29 @@ static func _haul_rate(sim: Simulation, d: int) -> float:
 	return equiv * Economy.miner_work_rate(sim, d) * sim.mods.m("haul_rate") * sim.boost_mult()
 
 
+## Haulage the depth can count on (units/s): rail carts plus every hauler
+## posted there who is not resting - on the job or still walking to it.
+## Miners send that much of their ore to the face pile (so haulers find work
+## when they arrive) and carry the rest to the station themselves.
+static func haul_capacity(sim: Simulation, d: int) -> float:
+	var key := "hcap%d" % d
+	if sim.memo.has(key):
+		return sim.memo[key]
+	var v := 0.0
+	var dep := sim.state.depth(d)
+	if not dep.is_empty() and dep["unlocked"]:
+		var post := "depth:%d" % d
+		var hauler := float(sim.content.role_by_id.get("hauler", {}).get("stats", {}).get("rate", 0.9))
+		var sup := float(sim.rt.get("posted", {}).get(post, {}).get("supervisor", 0.0)) \
+			* float(sim.content.role_by_id.get("supervisor", {}).get("stats", {}).get("area_bonus", 0.15))
+		var equiv := float(sim.rt.get("posted", {}).get(post, {}).get("hauler", 0.0)) * hauler * (1.0 + sup)
+		equiv += sim.content.equipment_stat("haulage", "cart_rate", int(dep["levels"]["haulage"]))
+		if equiv > 0.0:
+			v = equiv * Economy.miner_work_rate(sim, d) * sim.mods.m("haul_rate") * sim.boost_mult()
+	sim.memo[key] = v
+	return v
+
+
 static func tick_haulage(sim: Simulation, dt: float) -> void:
 	var out := {}
 	for dep in sim.state.depths:

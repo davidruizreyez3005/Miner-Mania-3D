@@ -8,17 +8,23 @@ finger), following the game through the lines it logs:
     [boot] ...                 version, window/view size, renderer, graphics preset
     [state] A -> B             every game-state transition
     [save] written: ...        every save (claim time, money)
+    [save] loaded: ...         a saved claim was loaded (Continue)
+    [title] save: ...          the title found a saved claim (claim time, money)
 
 Steps: title screen; tap "Start mining"; the world loads; skip the first
 tutorial tip; pan the camera (the picture must change); open the pause menu
 and resume by touch; pause and resume with the Back key; let the mine run
 (autosaves must show the claim clock advancing); send the app to the
-background (it must save) and bring it back (same process). Fails on any
-crash, ANR, script error or engine error. Writes a JSON report, a Markdown
-summary, the logcat and screenshots to --out.
+background (it must save) and bring it back (same process); install the APK
+again over the running game, as an update does - the title must offer the
+saved claim and Continue must load it. With --previous-apk (an earlier build
+signed with the same key) the run starts by installing that build, starting
+a claim and saving, then installing this APK over it: the claim must still
+be there. Fails on any crash, ANR, script error or engine error. Writes a
+JSON report, a Markdown summary, the logcat and screenshots to --out.
 
     python tools/device/device_smoke.py --apk build/apk/MinerMania3D-debug.apk \
-        --sdk "$ANDROID_SDK" --out build/device
+        --sdk "$ANDROID_SDK" --out build/device [--previous-apk old.apk]
 
 Tap positions come from the UI layout code for the 720x1280 design size
 (see TARGETS) and are mapped to the screen with the window/view sizes from
@@ -41,6 +47,8 @@ LOG_RE = re.compile(r"^\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+\s+(\d+)\s+(\d+)\s+([VDIWE
 BOOT_RE = re.compile(r"\[boot\] (.*) window \((\d+), (\d+)\), view \(([\d.]+), ([\d.]+)\), (.*)$")
 GRAPHICS_RE = re.compile(r", graphics (\w+)( \(auto\))?$")
 SAVE_RE = re.compile(r"\[save\] (written|FAILED): claim time (\d+) s, money (\d+)")
+TITLE_SAVE_RE = re.compile(r"\[title\] save: claim time (\d+) s, money (\d+)")
+LOADED_RE = re.compile(r"\[save\] loaded: claim time (\d+) s, money (\d+)")
 GODOT_ERROR_PREFIXES = ("SCRIPT ERROR", "USER SCRIPT ERROR", "ERROR", "USER ERROR")
 # What Godot logs when it probes Vulkan on a device without it and switches to
 # OpenGL ES (only accepted when the run is meant to test that fallback).
@@ -55,8 +63,10 @@ def targets(w: float, h: float) -> dict:
     return {
         # main.gd _show_menu: the stack at the bottom of the title screen
         # (version caption, Settings, Start mining) - a fresh install has no
-        # Continue button.
+        # Continue button. With a save, Continue sits above "New claim"
+        # (which takes Start mining's place).
         "start": (w * 0.5, h - 301.0),
+        "continue": (w * 0.5, h - 429.0),
         # tutorial_overlay.gd _layout_card: the first tip (no anchor) sits at
         # 60% of the height; "Skip tips" is its bottom-left button.
         "skip_tips": ((w - card_w) * 0.5 + 85.0, h * 0.60 + 128.0),
@@ -75,6 +85,11 @@ class Device:
     def __init__(self, adb: str, serial: str):
         self.adb = adb
         self.serial = serial
+
+    def run_out(self, *args: str, timeout: float = 60.0) -> tuple:
+        """(return code, stdout + stderr) - for commands whose refusal is the answer (install)."""
+        r = subprocess.run([self.adb, "-s", self.serial, *args], capture_output=True, timeout=timeout)
+        return r.returncode, (r.stdout + r.stderr).decode(errors="replace").replace("\r", "")
 
     def run(self, *args: str, timeout: float = 60.0, check: bool = True, binary: bool = False):
         cmd = [self.adb, "-s", self.serial, *args]
@@ -268,17 +283,24 @@ class Run:
 
     # ------------------------------------------------------------------ steps
 
-    def install(self) -> str:
-        self.dev.run("uninstall", PACKAGE, check=False, timeout=120)
+    def install(self, apk: Path | None = None, fresh: bool = True) -> str:
+        """Installs `apk` (this run's APK by default): fresh (uninstalled first)
+        or over the installed game, as an update does - keeping its data."""
+        apk = apk or self.args.apk
+        if fresh:
+            self.dev.run("uninstall", PACKAGE, check=False, timeout=120)
         t0 = time.monotonic()
-        out = self.dev.run("install", "-r", "-t", str(self.args.apk), timeout=self.t(600))
-        if "Success" not in out:
-            raise Failure("install did not report Success: " + out.strip()[-300:])
+        rc, out = self.dev.run_out("install", "-r", "-t", str(apk), timeout=self.t(600))
+        if rc != 0 or "Success" not in out:
+            raise Failure(("could not install over the installed game: " if not fresh else "install failed: ")
+                          + out.strip()[-400:])
         dump = self.dev.shell(f"dumpsys package {PACKAGE}")
         abi = re.search(r"primaryCpuAbi=(\S+)", dump)
         ver = re.search(r"versionName=(\S+)", dump)
+        code = re.search(r"versionCode=(\d+)", dump)
         self.report["primary_abi"] = abi.group(1) if abi else "?"
         self.report["version_name"] = ver.group(1) if ver else "?"
+        self.report["version_code"] = int(code.group(1)) if code else None
         self.report["install_s"] = round(time.monotonic() - t0, 1)
         comp = self.dev.shell(f"cmd package resolve-activity --brief -c android.intent.category.LAUNCHER {PACKAGE}")
         self.component = comp.strip().splitlines()[-1].strip()
@@ -288,12 +310,14 @@ class Run:
                f"launcher {self.component}, {self.report['install_s']}s"
 
     def launch(self) -> str:
-        self.log = Logcat(self.dev, self.out / "logcat.txt")
+        if self.log is None:
+            self.log = Logcat(self.dev, self.out / "logcat.txt")
+        mark = self.log.mark()
         t0 = time.monotonic()
         am = self.dev.shell(f"am start -W -n {self.component}", timeout=self.t(120))
         total = re.search(r"TotalTime: (\d+)", am)
         self.report["activity_start_ms"] = int(total.group(1)) if total else None
-        msg, _ = self.log.wait(r"^\[boot\]", self.t(180))
+        msg, i = self.log.wait(r"^\[boot\]", self.t(180), mark)
         m = BOOT_RE.search(msg)
         if not m:
             raise Failure("unreadable boot line: " + msg)
@@ -311,7 +335,7 @@ class Run:
         self.report["graphics"] = (g.group(1) + (" (auto)" if g.group(2) else "")) if g else None
         if self.args.expect_graphics and (not g or g.group(1) != self.args.expect_graphics):
             raise Failure(f"graphics preset {self.report['graphics']}, expected {self.args.expect_graphics}: {msg}")
-        self.log.wait(r"^\[state\] BOOT -> MAIN_MENU", self.t(300))
+        self.log.wait(r"^\[state\] BOOT -> MAIN_MENU", self.t(300), i)
         self.report["title_s"] = round(time.monotonic() - t0, 1)
         self.pid0 = self.dev.pid()
         if not self.pid0:
@@ -398,7 +422,7 @@ class Run:
         # draw so slowly that the capped frame step makes it run slower.
         end = time.monotonic() + self.t(420)
         while len(saves) < 2:
-            msg, idx = self.log.wait(r"^\[save\] ", max(1.0, end - time.monotonic()), idx)
+            msg, idx = self.log.wait(r"^\[save\] (written|FAILED)", max(1.0, end - time.monotonic()), idx)
             m = SAVE_RE.search(msg)
             if not m or m.group(1) != "written":
                 raise Failure("save failed: " + msg)
@@ -412,7 +436,9 @@ class Run:
     def background(self) -> str:
         mark = self.log.mark()
         self.dev.key("KEYCODE_HOME")
-        self.log.wait(r"^\[save\] written", self.t(30), mark)
+        msg, _ = self.log.wait(r"^\[save\] written", self.t(30), mark)
+        m = SAVE_RE.search(msg)
+        self.saved_claim = int(m.group(2)) if m else 0
         time.sleep(5)
         self.dev.shell(f"am start -W -n {self.component}", timeout=self.t(60))
         time.sleep(6)
@@ -432,11 +458,77 @@ class Run:
         self.report["memory_pss_mb"] = round(int(pss.group(1)) / 1024.0, 1) if pss else None
         return f"still running; memory (PSS) {self.report['memory_pss_mb']} MB"
 
+    # ---------------------------------------------------------------- updates
+
+    def continue_saved(self, at_least: int, label: str) -> str:
+        """Launches the installed game: the title must offer a saved claim at
+        least `at_least` seconds old and Continue must load it."""
+        mark = self.log.mark()
+        self.launch()
+        msg, i = self.log.wait(r"^\[title\] save", self.t(60), mark)
+        m = TITLE_SAVE_RE.search(msg)
+        if not m:
+            raise Failure(f"{label}: the title found no readable save: {msg}")
+        claim = int(m.group(1))
+        if claim < at_least:
+            raise Failure(f"{label}: the title offers a claim at {claim}s, older than the one saved at {at_least}s")
+        time.sleep(2)
+        self.tap("continue")
+        msg, j = self.log.wait(r"^\[save\] loaded", self.t(60), i)
+        loaded = LOADED_RE.search(msg)
+        if not loaded or int(loaded.group(1)) != claim:
+            raise Failure(f"{label}: Continue loaded something else: {msg}")
+        self.log.wait(r"^\[state\] LOADING -> PLAYING", self.t(600), j)
+        time.sleep(3)
+        self.shot(label.replace(" ", "_"))
+        return f"the title offers the claim at {claim}s (money {m.group(2)}) and Continue loads it"
+
+    def previous_build_saves(self) -> str:
+        """The earlier build: a new claim, skip the tips, run until an autosave,
+        then to the background (it saves)."""
+        self.launch()
+        self.start_game()
+        self.skip_tutorial()
+        mark = self.log.mark()
+        end = time.monotonic() + self.t(300)
+        claim = 0
+        idx = mark
+        while claim <= 0:
+            msg, idx = self.log.wait(r"^\[save\] written", max(1.0, end - time.monotonic()), idx)
+            m = SAVE_RE.search(msg)
+            claim = int(m.group(2)) if m else 0
+        mark = self.log.mark()
+        self.dev.key("KEYCODE_HOME")
+        msg, _ = self.log.wait(r"^\[save\] written", self.t(30), mark)
+        m = SAVE_RE.search(msg)
+        self.prev_claim = int(m.group(2)) if m else claim
+        self.report["update_from"] = {"version_name": self.report.get("version_name"),
+                                      "version_code": self.report.get("version_code"), "claim_s": self.prev_claim}
+        return f"version {self.report.get('version_name')} saved a claim at {self.prev_claim}s"
+
+    def install_over(self) -> str:
+        before = self.report.get("version_code")
+        out = self.install(self.args.apk, fresh=False)
+        after = self.report.get("version_code")
+        if before is not None and after is not None and after < before:
+            raise Failure(f"the version code went down ({before} -> {after})")
+        return f"installed over the game ({before} -> {after}): {out}"
+
+    def update_in_place(self) -> str:
+        self.install(self.args.apk, fresh=False)
+        return self.continue_saved(getattr(self, "saved_claim", 0), "after reinstalling over the game")
+
     # -------------------------------------------------------------------- run
 
     def execute(self) -> bool:
         ok = True
         try:
+            if self.args.previous_apk:
+                self.step("update: install the previous build", lambda: self.install(self.args.previous_apk, True))
+                self.step("update: the previous build starts a claim and saves", self.previous_build_saves)
+                self.step("update: install this build over it", self.install_over)
+                self.step("update: the claim is still there",
+                          lambda: self.continue_saved(self.prev_claim, "after the update"))
             self.step("install", self.install)
             self.step("launch to the title screen", self.launch)
             self.step("touch: start a new claim, world loads", self.start_game)
@@ -447,6 +539,7 @@ class Run:
             self.step("simulation runs (autosaves)", self.simulation)
             self.step("background and resume", self.background)
             self.step("stability", self.stability)
+            self.step("install over the running game keeps the save", self.update_in_place)
         except Failure as e:
             ok = False
             print(f"FAILED: {e}", flush=True)
@@ -490,6 +583,9 @@ class Run:
                          f"window {r.get('window')}, renderer {r.get('renderer')}")
         if r.get("graphics"):
             lines.append(f"- graphics preset picked on first launch: {r['graphics']}")
+        if r.get("update_from"):
+            u = r["update_from"]
+            lines.append(f"- updated from {u.get('version_name')} (code {u.get('version_code')}) with a claim saved at {u.get('claim_s')}s")
         for k, label in (("title_s", "title screen after launch"), ("world_load_s", "world loaded after tap"),
                          ("memory_pss_mb", "memory PSS (MB)"),
                          ("emulator_frame_ms_median", "frame time on this software-rendered emulator (ms, median)")):
@@ -525,6 +621,8 @@ def main() -> int:
     ap.add_argument("--label", default="", help="name of this run in the report (e.g. the build variant)")
     ap.add_argument("--expect-driver", default="", help="fail unless the game renders with this driver (vulkan, opengl3)")
     ap.add_argument("--expect-graphics", default="", help="fail unless the first launch picks this graphics preset (Low, Medium, High)")
+    ap.add_argument("--previous-apk", type=Path, default=None,
+                    help="an earlier build signed with the same key: install it, save a claim, then update to --apk")
     args = ap.parse_args()
     if not args.apk.is_file():
         print(f"error: {args.apk} not found", file=sys.stderr)

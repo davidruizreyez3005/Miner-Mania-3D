@@ -132,6 +132,12 @@ func _build_terrain() -> void:
 		for q in path.get("points", []):
 			pp.append(Vector2(float(q[0]), float(q[1])))
 		tb.add_road(pp, float(path.get("width", 2.4)))
+	# The truck yard: flat gravel from the bays up to the road.
+	var yard := _truck_yard_rect()
+	if yard.has_area():
+		tb.add_pad(yard.get_center(), yard.size)
+		tb.add_road(PackedVector2Array([Vector2(yard.position.x + 1.0, yard.get_center().y),
+			Vector2(yard.end.x - 1.0, yard.get_center().y)]), yard.size.y)
 	var region: Dictionary = content.region_by_id.get(sim.state.region, content.regions[0])
 	var mat := WorldMaterials.terrain(region)
 	var terrain := MeshInstance3D.new()
@@ -154,6 +160,24 @@ var _terrain_builder: TerrainBuilder
 
 func ground_height(x: float, z: float) -> float:
 	return _terrain_builder.height(x, z) if _terrain_builder else 0.0
+
+
+## The depot's truck yard (xz): every bay, its way out to the road and the
+## turn trucks reverse in along.
+func _truck_yard_rect() -> Rect2:
+	var r := Rect2()
+	for b in SiteLayout.truck_bay_rects(layout):
+		r = b if not r.has_area() else r.merge(b)
+	if r.has_area():
+		var y: Dictionary = layout.data.get("surface", {}).get("truck_yard", {})
+		var bays := SiteLayout.truck_bays(layout)
+		var turn := float(y.get("reverse_radius", 0.0))
+		var west: Vector3 = bays[0]
+		for b in bays:
+			west = b if (b as Vector3).x < west.x else west
+		r = r.expand(Vector2(r.position.x, float(y.get("exit_z", r.end.y))))
+		r = r.expand(Vector2(west.x - turn, float(y.get("lane_back_z", r.end.y)) - turn)).grow(0.6)
+	return r
 
 
 ## Axis-aligned footprint (x, z) of an asset rotated by yaw, relative to its origin.
@@ -194,6 +218,11 @@ func _build_surface_dressing() -> void:
 		var sp := layout.position(loc)
 		modules.records.append({"module": "stop:" + loc, "zone": "surface", "depth": 0, "solid": true, "clear": 0.2,
 			"rect": Rect2(Vector2(sp.x - 0.8, sp.z - 0.8), Vector2(1.6, 1.6)), "y0": -1.0, "y1": 2.0, "nav_ignore": true})
+	# The truck yard stays clear of dressing; people walk around it.
+	var yard := _truck_yard_rect()
+	if yard.has_area():
+		modules.records.append({"module": "truck_yard", "zone": "surface", "depth": 0, "solid": true, "clear": 0.3,
+			"rect": yard, "y0": -1.0, "y1": 5.0, "nav_ignore": false})
 	var by_module := {}
 	for item in layout.data.get("surface", {}).get("dressing", []):
 		var mid := String(item.get("module", ""))

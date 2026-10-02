@@ -3,15 +3,18 @@
 
     python tools/apk/verify_apk.py <apk> --sdk <android_sdk> [--report out.json]
         [--manifest out.json] [--expect-release] [--max-mb 250]
+        [--expect-version-code N] [--expect-version-name S] [--expect-cert-sha256 HEX]
 
 Checks (any failure exits 1):
   * the file exists, is non-empty and within the size budget
   * it is a well-formed zip with the Android essentials (manifest, dex,
     resources) and the Godot engine library for arm64-v8a only
   * package id, version code/name and native ABI match export_presets.cfg
-    (read with aapt2 from the SDK build-tools)
-  * the signature verifies (apksigner; v2+ scheme), and a release build is
-    not signed with the Android debug certificate
+    or the build's stamped version (read with aapt2 from the SDK build-tools)
+  * the signature verifies (apksigner; v2+ scheme), a release build is not
+    signed with the Android debug certificate, and when the expected signing
+    certificate is given (the update key) the APK carries exactly that one -
+    the condition for installing over an earlier build and keeping its data
   * the game is packaged: project settings, every content data file, the
     asset catalog, and an imported model for every asset the game uses
   * no secrets inside: no keystore/key/credential files, no private keys or
@@ -70,6 +73,9 @@ def main() -> int:
     ap.add_argument("--manifest", default="")
     ap.add_argument("--expect-release", action="store_true")
     ap.add_argument("--max-mb", type=float, default=250.0)
+    ap.add_argument("--expect-version-code", default="", help="default: export_presets.cfg")
+    ap.add_argument("--expect-version-name", default="", help="default: export_presets.cfg")
+    ap.add_argument("--expect-cert-sha256", default="", help="SHA-256 of the signing certificate (hex, colons allowed)")
     a = ap.parse_args()
     fails, notes = [], []
     apk = pathlib.Path(a.apk)
@@ -104,8 +110,8 @@ def main() -> int:
 
     opts = preset_options()
     want_pkg = opts.get("package/unique_name", "")
-    want_code = opts.get("version/code", "")
-    want_name = opts.get("version/name", "")
+    want_code = a.expect_version_code or opts.get("version/code", "")
+    want_name = a.expect_version_name or opts.get("version/name", "")
     aapt = pathlib.Path(a.sdk) / "build-tools"
     aapt2 = sorted(aapt.glob("*/aapt2"))
     if check(bool(aapt2), "aapt2 available in the SDK"):
@@ -130,6 +136,12 @@ def main() -> int:
               "Verified using v3 scheme (APK Signature Scheme v3): true" in out, "signature verifies (v2/v3)")
         dn = re.search(r"Signer #1 certificate DN: (.*)", out)
         info["signer"] = dn.group(1).strip() if dn else ""
+        digests = re.findall(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)", out)
+        info["cert_sha256"] = digests[0].lower() if digests else ""
+        check(len(digests) == 1, "exactly one signer (%d)" % len(digests))
+        if a.expect_cert_sha256:
+            want = a.expect_cert_sha256.replace(":", "").strip().lower()
+            check(info["cert_sha256"] == want, "signed with the update key (certificate SHA-256 %s)" % (info["cert_sha256"][:16] + "..."))
         if a.expect_release:
             check(not any(d in info["signer"] for d in DEBUG_CERT_DNS), "release build is not signed with a debug certificate")
 

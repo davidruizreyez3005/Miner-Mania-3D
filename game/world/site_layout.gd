@@ -96,6 +96,25 @@ static func unit_rects(fid: String, plot: Dictionary, asset_id: String, tier: in
 	return out
 
 
+## The depot's truck bays (layout surface.truck_yard): bay centres on the
+## ground plane; trucks park facing the road (+z).
+static func truck_bays(layout: WorldLayout) -> Array:
+	var out: Array = []
+	for b in layout.data.get("surface", {}).get("truck_yard", {}).get("bays", []):
+		out.append(Vector3(float(b[0]), 0.0, float(b[1])))
+	return out
+
+
+## The footprint (xz) of the biggest truck parked in each bay.
+static func truck_bay_rects(layout: WorldLayout) -> Array:
+	var fp := footprint("veh_mining_truck_01", 0.0)
+	var out: Array = []
+	for c in truck_bays(layout):
+		var p: Vector3 = c
+		out.append(Rect2(fp.position + Vector2(p.x, p.z), fp.size))
+	return out
+
+
 ## The road band trucks drive along (xz rects, one per polyline segment).
 static func road_rects(layout: WorldLayout) -> Array:
 	return _band_rects(layout.data.get("surface", {}).get("road", []), ROAD_WIDTH)
@@ -173,6 +192,26 @@ static func problems(content: ContentDB, layout: WorldLayout) -> Array:
 		for u in units:
 			if (u[1] as Rect2).grow(0.2).has_point(Vector2(p.x, p.z)):
 				e.append("walk stop %s is inside facility %s" % [loc, u[0]])
+	# Truck bays: inside the site, clear of every facility, footpath, walk
+	# stop and each other (trucks must never park inside one another).
+	var bays := truck_bay_rects(layout)
+	for i in bays.size():
+		var br: Rect2 = bays[i]
+		if not bounds.encloses(br):
+			e.append("truck bay %d leaves the site bounds" % i)
+		for u in units:
+			if u[0] != "depot" and (u[1] as Rect2).intersects(br):
+				e.append("truck bay %d clips facility %s" % [i, u[0]])
+		for pr2 in path_rects(layout):
+			if (pr2 as Rect2).intersects(br):
+				e.append("truck bay %d blocks a footpath" % i)
+		for loc2 in ["surface:landing", "surface:rest", "surface:gate", "plant"]:
+			var sp := layout.position(loc2)
+			if br.grow(0.5).has_point(Vector2(sp.x, sp.z)):
+				e.append("walk stop %s is inside truck bay %d" % [loc2, i])
+		for j in range(i + 1, bays.size()):
+			if br.grow(0.3).intersects(bays[j]):
+				e.append("truck bays %d and %d are too close" % [i, j])
 	for fac in content.facilities:
 		var fid := String(fac["id"])
 		var plot := layout.plot(String(fac.get("plot", fid)))

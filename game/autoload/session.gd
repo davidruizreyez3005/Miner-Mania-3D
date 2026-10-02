@@ -65,6 +65,7 @@ func load_game() -> bool:
 			Telemetry.track("save_corrupt", {"detail": r.get("detail", "")})
 		return false
 	sim = Simulation.new(content, r["state"])
+	print("[save] loaded: claim time %.0f s, money %.0f (%s)" % [sim.state.run_time, sim.state.money, String(r.get("source", "main"))])
 	if r.get("source", "main") == "backup":
 		load_notice = "The last save was damaged - restored the previous one."
 		Telemetry.track("save_backup_used", {"errors": r.get("recovered_from", [])})

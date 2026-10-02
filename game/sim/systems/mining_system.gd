@@ -63,17 +63,13 @@ static func respawn_s(sim: Simulation, d: int) -> float:
 	return base / ((1.0 + geo) * sim.mods.m("node_regen"))
 
 
-## Where mined ore goes right now and how much room is left there.
-static func target_buffer(sim: Simulation, d: int) -> Array:
-	var dep := sim.state.depth(d)
-	if TransportSystem.haul_rate(sim, d) > 0.0:
-		return [dep["face"], Economy.face_capacity(sim, d), true]
-	return [dep["station"], Economy.station_capacity(sim, d), false]
-
-
+## Room for the miners' ore: at the face pile while there is haulage, or
+## at the shaft station (they carry it there themselves).
 static func has_space(sim: Simulation, d: int) -> bool:
-	var tb := target_buffer(sim, d)
-	return Simulation.inv_total(tb[0]) < float(tb[1]) - 0.01
+	var dep := sim.state.depth(d)
+	if TransportSystem.haul_capacity(sim, d) > 0.0 and Simulation.inv_total(dep["face"]) < Economy.face_capacity(sim, d) - 0.01:
+		return true
+	return Simulation.inv_total(dep["station"]) < Economy.station_capacity(sim, d) - 0.01
 
 
 static func hazard_factor(sim: Simulation, d: int) -> float:
@@ -94,29 +90,49 @@ static func _tick_depth(sim: Simulation, dep: Dictionary, dt: float) -> Dictiona
 	var t0 := sim.state.run_time
 	var sup := sim.crew(post, "supervisor") * float(sim.content.role_by_id.get("supervisor", {}).get("stats", {}).get("area_bonus", 0.15))
 	var rate := Economy.miner_work_rate(sim, d) * sim.crew(post, "miner") * hazard_factor(sim, d) * (1.0 + sup) * sim.boost_mult()
-	var tb := target_buffer(sim, d)
-	var target: Dictionary = tb[0]
-	var to_face: bool = tb[2]
-	if not to_face:
-		rate *= float(sim.content.bal("face", "self_haul_factor", 0.55))
-	var space := maxf(0.0, float(tb[1]) - Simulation.inv_total(target))
-	var n_active := active_slots(dep).size()
-	var r_node := rate / float(maxi(1, n_active))
+	# Haulers and carts take what they can from the face; the miners carry
+	# the rest to the station themselves, slower (never less than without
+	# haulage), and also whatever the face pile has no room for.
+	var self_haul := float(sim.content.bal("face", "self_haul_factor", 0.55))
+	var face_rate := minf(rate, TransportSystem.haul_capacity(sim, d))
+	var face_space := maxf(0.0, Economy.face_capacity(sim, d) - Simulation.inv_total(dep["face"]))
+	var p1 := _mine_pass(sim, dep, face_rate, dt, t0, dep["face"], face_space)
+	# Work the full face pile turned away goes to the station by hand too.
+	var unplaced := maxf(0.0, face_rate - float(p1[1]) / dt) if float(p1[2]) <= 0.01 else 0.0
+	var self_rate := (rate - face_rate + unplaced) * self_haul
+	var st_space := maxf(0.0, Economy.station_capacity(sim, d) - Simulation.inv_total(dep["station"]))
+	var p2 := _mine_pass(sim, dep, self_rate, dt, t0, dep["station"], st_space)
+	var produced := float(p1[0]) + float(p2[0])
+	# Stalled: the miners' ore has nowhere to go (station full, and the face
+	# full or no haulage) - the lift is the bottleneck.
+	var stalled := rate > 0.0 and st_space <= 0.01 and (face_rate <= 0.0 or face_space <= 0.01)
+	return {"work_rate": face_rate + self_rate, "units_rate": produced / dt, "to_face": face_rate > 0.0,
+		"space": face_space + st_space, "stalled": stalled}
+
+
+## Mines every active vein at `rate` (work/s, shared) into `target` with
+## `space` room; returns [units placed, work done, room left]. Depleted veins
+## regrow on schedule even when nobody mines (rate 0).
+static func _mine_pass(sim: Simulation, dep: Dictionary, rate: float, dt: float, t0: float, target: Dictionary, space: float) -> Array:
+	var r_node := maxf(rate, 0.0) / float(maxi(1, active_slots(dep).size()))
 	var produced := 0.0
+	var work := 0.0
 	var nodes: Array = dep["nodes"]
 	for i in nodes.size():
 		var res := _mine_node(sim, dep, i, r_node, dt, t0, target, space)
 		space = res[0]
 		produced += res[1]
-	return {"work_rate": rate, "units_rate": produced / dt, "to_face": to_face, "space": space, "stalled": rate > 0.0 and space <= 0.01}
+		work += res[2]
+	return [produced, work, space]
 
 
 ## Mines one vein for `dt` (handling depletion and respawn inside the step).
-## Returns [remaining space, units produced].
+## Returns [remaining space, units produced, work done].
 static func _mine_node(sim: Simulation, dep: Dictionary, i: int, r_node: float, dt: float, t0: float, target: Dictionary, space: float) -> Array:
 	var d := int(dep["index"])
 	var node: Dictionary = dep["nodes"][i]
 	var produced := 0.0
+	var done := 0.0
 	var tl := 0.0
 	var guard := 0
 	while tl < dt - 1e-9 and guard < 64:
@@ -144,6 +160,7 @@ static func _mine_node(sim: Simulation, dep: Dictionary, i: int, r_node: float, 
 		sim.state.stat_add("mined_units", units)
 		space -= units
 		produced += units
+		done += work
 		node["hp"] = float(node["hp"]) - work
 		tl += work / r_node
 		if float(node["hp"]) <= 1e-6:
@@ -152,7 +169,7 @@ static func _mine_node(sim: Simulation, dep: Dictionary, i: int, r_node: float, 
 			sim.emit("node_depleted", {"depth": d, "slot": node["slot"], "resource": node["resource"]})
 		elif work < work_possible - 1e-9:
 			break
-	return [space, produced]
+	return [space, produced, done]
 
 
 ## One swing of the foreman's pick at a vein. Returns units mined.

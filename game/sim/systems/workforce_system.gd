@@ -40,9 +40,18 @@ static func on_job(sim: Simulation, w: Dictionary) -> bool:
 static func update_crews(sim: Simulation, dt: float = 0.0) -> void:
 	var crew := {}
 	var repair := {}
+	var posted := {}
 	var t := sim.state.run_time
 	for w in sim.state.workers:
-		if not String(w["job"]) in PRODUCTIVE or w["resting"]:
+		if w["resting"]:
+			continue
+		# Everyone available at a post, on the job yet or not (haulage
+		# capacity counts haulers still walking to the face).
+		var pp := String(w["post"])
+		if not posted.has(pp):
+			posted[pp] = {}
+		posted[pp][w["role"]] = float(posted[pp].get(w["role"], 0.0)) + efficiency(sim, w)
+		if not String(w["job"]) in PRODUCTIVE:
 			continue
 		var arrive := float(w["arrive_at"])
 		var frac := 1.0
@@ -61,6 +70,7 @@ static func update_crews(sim: Simulation, dt: float = 0.0) -> void:
 			repair[w["target"]] = float(repair.get(w["target"], 0.0)) + e
 	sim.rt["crew"] = crew
 	sim.rt["repair_crew"] = repair
+	sim.rt["posted"] = posted
 
 
 static func tick(sim: Simulation, dt: float) -> void:
@@ -223,11 +233,15 @@ static func _context(sim: Simulation) -> Dictionary:
 		var nodes := {}
 		for slot in MiningSystem.active_slots(dep):
 			nodes[slot] = ["node:%d" % slot, "depth:%d:node:%d" % [d, slot]]
+		# Haulers have work while ore lies at the face or miners are digging
+		# (their ore goes to the face for them), and the station has room.
+		var station_room := Simulation.inv_total(dep["station"]) < Economy.station_capacity(sim, d) - 0.01
+		var digging := sim.crew("depth:%d" % d, "miner") > 0.0
 		ctx["depth"][d] = {
 			"space": MiningSystem.has_space(sim, d),
 			"active": MiningSystem.active_slots(dep),
 			"nodes": nodes,
-			"haul": Simulation.inv_total(dep["face"]) > 0.01 and Simulation.inv_total(dep["station"]) < Economy.station_capacity(sim, d) - 0.01,
+			"haul": station_room and (digging or Simulation.inv_total(dep["face"]) > 0.01),
 			"rest": "depth:%d:rest" % d, "face": "depth:%d:face" % d, "station": "depth:%d:station" % d, "tag": "depth:%d" % d,
 		}
 	for fid in sim.content.processing_facilities():

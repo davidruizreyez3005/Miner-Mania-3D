@@ -11,6 +11,9 @@ name: Release
 # The keystore lives in the runner's temp directory for the export only; the
 # password reaches Godot through its GODOT_ANDROID_KEYSTORE_RELEASE_*
 # environment variables, and the APK is scanned to prove none of it leaked.
+# It is the same update key the Android workflow signs every build with, and
+# the version code comes from the commit, so a release installs over any
+# earlier build and keeps its save (docs/android_signing.md).
 
 on:
   push:
@@ -84,7 +87,9 @@ jobs:
         run: |
           name="${VERSION_NAME#v}"
           [[ "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version '$name' is not semantic (x.y.z)"; exit 1; }
-          sed -i "s/^version\/name=.*/version\/name=\"$name\"/; s/^version\/code=.*/version\/code=${{ github.run_number }}/" export_presets.cfg
+          # The version code comes from the commit (as for every CI build), so
+          # a release installs over any earlier build and keeps its save.
+          python tools/apk/set_version.py --name "$name" --github-env
           sed -i "s/^config\/version=.*/config\/version=\"$name\"/" project.godot
           echo "APP_VERSION=$name" >> "$GITHUB_ENV"
 
@@ -116,6 +121,7 @@ jobs:
             ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           python tools/apk/verify_apk.py "build/apk/MinerMania3D-$APP_VERSION.apk" --sdk "$ANDROID_SDK" --expect-release \
+            --expect-version-code "$APK_VERSION_CODE" --expect-version-name "$APK_VERSION_NAME" \
             --report build/apk/apk_report.json --manifest build/apk/apk_manifest.json
 
       - name: Publish the GitHub release

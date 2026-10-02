@@ -74,6 +74,10 @@ maintenance, progression. Rules that matter:
   wears: `service_s` at each stop, leaving it in full condition) and drop it
   for any machine below `service_at`, claiming jobs so two never swap
   machines; every 20 % of condition they restore counts as a repair.
+- **Haulage never slows the mine**: miners fill the face buffer as fast as
+  the posted haulers (and carts) can carry it to the station
+  (`TransportSystem.haul_capacity`) and carry the rest themselves at 55 %
+  pace, so a hired hauler always has ore to carry and never costs output.
 - **Automation stages** (Manual, Semi-Automated, Automated, Industrial) come
   from what runs without the player: miners, lift operators, sales managers,
   self-running machines.
@@ -130,7 +134,15 @@ simulation:
   machine, work animations by utilisation, worn smoke, loop sounds), depths
   (lamps, supports, rails, carts, station piles, dressing, hazards, veins
   that deplete and regrow), the headframe (cage, rope and sheave driven by
-  the lift), the trucks.
+  the lift), the depot's trucks.
+- **Trucks** (`SalesView`): every truck has its own bay in the depot's yard
+  (`surface.truck_yard`); it loads, pulls out and turns onto the eastbound
+  lane, drives off the map to the market, comes back on the other lane and
+  reverses into its bay along a quarter turn. Trucks drive their whole round
+  at one speed, so where each will be is known when it leaves: a loaded
+  truck pulls out only when its round keeps clear of every other truck's
+  (separating-axis test of the footprints along both rounds) and waits in
+  its bay otherwise - automatic sales and SELL alike.
 - **Atmosphere** per region and depth (sky, fog, ambient, sun), with render
   layers so the sun never lights the galleries.
 
@@ -301,9 +313,11 @@ gameplay (commands, costs, processing, wear and repair), offline (guards,
 accuracy, reports), progression (quests, achievements, contracts,
 prestige, determinism), saves (round trip, migration, corruption,
 checksums, timestamps), balance (pacing), game state (transitions) and world
-(module definitions, camp layout, full-world placement, navigation, cage
-routes, agents, the foreman and taps queued on his way, camera drag
-directions, triangle budgets) and graphics (presets, device detection, the
+(module definitions, camp layout and truck bays, full-world placement,
+navigation, cage routes, agents, the foreman and taps queued on his way,
+haulers carrying sacks, mechanics walking between machines, trucks that
+never touch - automatic sales and SELL - and park in their own bays, camera
+drag directions, triangle budgets) and graphics (presets, device detection, the
 world following a preset and back, the player's choice, the watchdog).
 `tools/godot/ui_smoke.gd` boots the real game and plays it end to end with
 touch events - every tutorial tip (Next, taps on the vein, LIFT, SELL and
@@ -318,11 +332,23 @@ or emulator with real touch input through adb, following the game's log
 lines (`[boot]`, `[state] A -> B`, `[save] ...`): title, new claim,
 tutorial, camera pan (the picture must change), pause menu, Back key,
 autosaves with the claim clock advancing, background and resume in the same
-process, the graphics preset the first launch picked, and no crash, ANR or
-engine error. CI runs it on an Android 15 x86_64 emulator (4 GB, software
+process, the graphics preset the first launch picked, an update installed
+over the running game that must keep the save (and, when the previous CI
+build carries the same signing key, an update from that build with a saved
+claim), and no crash, ANR or engine error. CI runs it on an Android 15 x86_64 emulator (4 GB, software
 graphics - the first launch must pick Low): the shipped arm64-v8a APK
 (through the image's ARM translation) on the OpenGL ES fallback (the
 emulator without Vulkan), and an x86_64 twin exported from a copy of the
 same preset - `tools/apk/compare_content.py` proves it identical apart from
 the engine's native library - on Vulkan, where the twin runs without frame
 pacing.
+
+## Android updates
+
+A new APK installs over the game - keeping the save - only with the same
+package id, a version code that is not lower and the same signing key.
+`tools/apk/set_version.py` stamps every build with a version code from its
+commit time (minutes since 2020), and CI signs with one update key from the
+repository secrets; `tools/apk/verify_apk.py` checks the version and the
+signing certificate of every APK. Setup, and the one-time switch from builds
+signed with a one-off key: [android_signing.md](android_signing.md).

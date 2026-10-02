@@ -123,6 +123,40 @@ func test_miners_produce_automatically() -> void:
 	assert_true(String(w["location"]).begins_with("depth:1"), "miner went underground: %s" % w["location"])
 
 
+## Units that reached depth 1's shaft station in `seconds` with a crew of
+## miners and haulers (the lift is off: nothing leaves the station, which is
+## upgraded so it never fills). Returns [units, simulation].
+func _station_inflow(miners: int, haulers: int, seconds: float) -> Array:
+	var sim := make_sim(5)
+	sim.state.money = 1e6
+	sim.state.quests["q_first_miner"] = "claimed"
+	assert_ok(sim.execute({"type": "upgrade_equipment", "depth": 1, "equipment": "station", "count": 30}))
+	assert_ok(sim.execute({"type": "upgrade_equipment", "depth": 1, "equipment": "mining", "count": 4}))     # 3 miner slots
+	for i in miners:
+		assert_ok(sim.execute({"type": "hire", "role": "miner", "post": "depth:1"}))
+	for i in haulers:
+		assert_ok(sim.execute({"type": "hire", "role": "hauler", "post": "depth:1"}))
+	sim.advance(seconds, 0.1)
+	return [Simulation.inv_total(sim.state.depth(1)["station"]), sim]
+
+
+func test_haulers_get_work_and_never_slow_the_mine() -> void:
+	## A hired hauler used to stand at the rest corner forever: miners only
+	## dropped ore at the face while a hauler was already working there.
+	var r := _station_inflow(2, 1, 150.0)
+	var sim: Simulation = r[1]
+	var hauler: Dictionary = {}
+	for w in sim.state.workers:
+		if w["role"] == "hauler":
+			hauler = w
+	assert_eq(String(hauler["job"]), "haul", "the hauler hauls (%s at %s)" % [hauler["job"], hauler["location"]])
+	assert_gt(float(sim.rt["haul"][1]["moved_rate"]), 0.0, "ore moves from the face to the station")
+	var without := float(_station_inflow(2, 0, 150.0)[0])
+	assert_gt(float(r[0]), without * 1.15, "one hauler with two miners delivers more than the miners alone (%.1f vs %.1f)" % [r[0], without])
+	var many := float(_station_inflow(3, 1, 150.0)[0])
+	assert_gt(many, float(r[0]), "a third miner still adds output with one hauler (the rest is carried by hand)")
+
+
 func test_operator_automates_lift_and_manager_sales() -> void:
 	var sim := make_sim()
 	sim.state.money = 1e6

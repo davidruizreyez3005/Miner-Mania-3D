@@ -126,6 +126,32 @@
     -25.0
    ]
   ],
+  "truck_yard": {
+   "_comment": "The depot's truck bays south of the road, side by side, trucks facing the road (+z). A truck pulls out straight to exit_z, turns onto lane_out_z (eastbound) and drives to end_x; it comes back on lane_back_z, drives past its bay by reverse_radius and reverses in along a quarter turn. A loaded truck pulls out only when its whole round keeps clear of the other trucks (SalesView).",
+   "bays": [
+    [
+     29.0,
+     -35.4
+    ],
+    [
+     33.9,
+     -35.4
+    ],
+    [
+     38.8,
+     -35.4
+    ],
+    [
+     43.7,
+     -35.4
+    ]
+   ],
+   "exit_z": -27.7,
+   "lane_out_z": -23.1,
+   "lane_back_z": -26.9,
+   "reverse_radius": 5.0,
+   "end_x": 72.0
+  },
   "plots": {
    "headframe": {
     "pos": [
@@ -448,18 +474,18 @@
    {
     "module": "mod_container_blue",
     "pos": [
-     38.5,
-     -32.0
+     48.2,
+     -33.6
     ],
-    "yaw": 90
+    "yaw": 0
    },
    {
     "module": "mod_container_red",
     "pos": [
-     38.5,
-     -35.2
+     48.2,
+     -40.2
     ],
-    "yaw": 90
+    "yaw": 0
    },
    {
     "module": "mod_container_red",
