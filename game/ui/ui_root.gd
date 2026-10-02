@@ -214,11 +214,14 @@ func _update_dim() -> void:
 	_dim.visible = any_popup
 
 
-## Wraps a panel in its frame: bottom sheet, full screen or popup card.
+## Wraps a panel in its frame: bottom sheet, full screen or popup card. The
+## frame's right margin is narrower by the scroll bar's lane (GUTTER), which
+## the list always keeps (ScrollContainer reserve mode): content has equal
+## margins left and right, and the same width with or without the bar.
 func _frame(p: GamePanel) -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var outer := PanelContainer.new()
-	var box := UiKit.vbox(14)
+	var box := UiKit.vbox(UiTheme.GAP)
 	var header := UiKit.hbox(12)
 	if p.icon_kind() != "":
 		header.add_child(Icon.make(p.icon_kind(), 46, UiTheme.TEXT))
@@ -227,8 +230,11 @@ func _frame(p: GamePanel) -> void:
 	t.clip_text = true
 	header.add_child(t)
 	header.add_child(UiKit.icon_button("close", func() -> void: close_panel(p), 76, "Flat"))
-	box.add_child(header)
-	p.content = UiKit.vbox(14)
+	var header_lane := MarginContainer.new()
+	header_lane.add_theme_constant_override("margin_right", UiTheme.GUTTER)
+	header_lane.add_child(header)
+	box.add_child(header_lane)
+	p.content = UiKit.vbox(UiTheme.GAP)
 	p.content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var scroll := TouchScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -254,12 +260,16 @@ func _frame(p: GamePanel) -> void:
 			outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			outer.offset_top = 8
 			var sb := UiTheme.box(Color(UiTheme.BG, 0.985), 0, 22)
+			sb.content_margin_right = 22 - UiTheme.GUTTER
 			outer.add_theme_stylebox_override("panel", sb)
 			full_host.add_child(outer)
 			outer.modulate.a = 0.0
 			outer.create_tween().tween_property(outer, "modulate:a", 1.0, 0.16)
 		"popup":
 			var w := minf(vp.x - 48.0, 660.0)
+			var pb := (UiTheme.get_theme().get_stylebox("panel", "PanelContainer") as StyleBoxFlat).duplicate() as StyleBoxFlat
+			pb.content_margin_right = maxf(pb.content_margin_left - UiTheme.GUTTER, 2.0)
+			outer.add_theme_stylebox_override("panel", pb)
 			outer.custom_minimum_size = Vector2(w, 0)
 			outer.size = Vector2(w, 0)
 			popup_host.add_child(outer)
@@ -429,6 +439,11 @@ func _on_sim_event(ev: Dictionary) -> void:
 					toast("%s reached level %d" % [String(w.get("name", "")), int(ev.get("level", 1))], "info")
 		"machine_worn":
 			toast("%s is worn and slowing down" % String(c.facility(String(ev.get("facility", ""))).get("name", "A machine")), "bad")
+		"power_short":
+			if Session.sim != null:
+				var pf := String(ev.get("facility", ""))
+				toast("Not enough power: the %s runs at %d%%. %s" % [String(c.facility(pf).get("name", "machine")),
+					roundi(float(ev.get("factor", 0.0)) * 100.0), UiText.power_fix(Session.sim)], "bad")
 		"manual_mined":
 			if main and main.has_method("world_ref") and main.world_ref():
 				var w: MineWorld = main.world_ref()

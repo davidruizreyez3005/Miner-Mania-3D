@@ -114,6 +114,36 @@ static func kv(key: String, value: String, value_variation: String = "") -> HBox
 	return h
 
 
+## A button with a title line and a smaller second line (e.g. a worker and
+## what they are doing); returns the button, its labels are children 0/1 of
+## its box (see line_labels).
+static func two_line_button(title: String, line: String, cb: Callable, variation: String = "Chip", min_h: float = 84.0) -> Button:
+	var b := button("", cb, variation, min_h)
+	var v := vbox(2)
+	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	v.offset_left = 18
+	v.offset_right = -18
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var t := label(title, "Small")
+	t.add_theme_font_override("font", UiTheme.bold_font())
+	t.clip_text = true
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var c := label(line, "Caption")
+	c.clip_text = true
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(t)
+	v.add_child(c)
+	b.add_child(v)
+	return b
+
+
+## The title and second-line labels of a two_line_button.
+static func line_labels(b: Button) -> Array:
+	var v := b.get_child(b.get_child_count() - 1)
+	return [v.get_child(0), v.get_child(1)]
+
+
 ## Buy button with a price line; greyed out and red-priced when unaffordable.
 static func cost_button(title: String, cost: float, affordable: bool, cb: Callable, variation: String = "Primary", unit: String = "$") -> Button:
 	var b := button("", cb, variation, 92.0)

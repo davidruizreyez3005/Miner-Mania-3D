@@ -99,7 +99,7 @@
    "unlock": {
     "facility": "workshop"
    },
-   "description": "Walks to worn machines and repairs them. Worn machines run slower."
+   "description": "Walks a round of the machines from the workshop, keeps each one in full condition and rushes to any that wears down. Worn machines run slower."
   },
   {
    "id": "engineer",

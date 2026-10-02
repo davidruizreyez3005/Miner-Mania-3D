@@ -21,6 +21,7 @@ var _veins: VBoxContainer
 var _veins_sig := ""
 var _vein_rows: Array = []
 var _unlock_button: CostButton
+var _crew_rows: Array = []        # [worker id, two-line Button]
 
 
 func panel_id() -> String:
@@ -55,11 +56,12 @@ func build() -> void:
 	var dep := s.state.depth(d)
 	_eq.clear()
 	_hire.clear()
+	_crew_rows.clear()
 	content.add_child(UiKit.wrap(String(dd.get("story", ""))))
 	if dep.is_empty() or not dep["unlocked"]:
 		_build_locked(s, dd)
 		return
-	var pv := UiKit.vbox(6)
+	var pv := UiKit.vbox(UiTheme.GAP_IN)
 	_prod_label = UiKit.label("", "Accent")
 	pv.add_child(_prod_label)
 	_station_label = UiKit.label("", "Small")
@@ -72,8 +74,8 @@ func build() -> void:
 	section("Equipment")
 	for kind in EQUIP:
 		var eq: Dictionary = s.content.equipment.get(kind, {})
-		var v := UiKit.vbox(6)
-		var h := UiKit.hbox(8)
+		var v := UiKit.vbox(UiTheme.GAP_IN)
+		var h := UiKit.hbox(UiTheme.GAP_ROW)
 		var n := UiKit.label(String(eq.get("name", kind.capitalize())), "Small")
 		n.add_theme_font_override("font", UiTheme.bold_font())
 		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -83,7 +85,7 @@ func build() -> void:
 		v.add_child(h)
 		var st := UiKit.wrap("", "Caption")
 		v.add_child(st)
-		var row := UiKit.hbox(8)
+		var row := UiKit.hbox(UiTheme.GAP_ROW)
 		var bs := [
 			CostButton.make("+1", func() -> void: cmd({"type": "upgrade_equipment", "depth": d, "equipment": kind, "count": 1})),
 			CostButton.make("+10", func() -> void: cmd({"type": "upgrade_equipment", "depth": d, "equipment": kind, "count": 10})),
@@ -96,7 +98,7 @@ func build() -> void:
 		_eq[kind] = {"level": lv, "stat": st, "buttons": bs}
 		if kind == "mining":
 			anchor("depth_upgrade", bs[0])
-	var tv := UiKit.vbox(6)
+	var tv := UiKit.vbox(UiTheme.GAP_IN)
 	_tool_label = UiKit.wrap("", "Small")
 	tv.add_child(_tool_label)
 	_tool_button = CostButton.make("Upgrade tools", func() -> void: cmd({"type": "buy_tool", "depth": d}))
@@ -107,8 +109,8 @@ func build() -> void:
 		if not SimCommands.role_unlocked(s, role):
 			continue
 		var r: Dictionary = s.content.role_by_id.get(role, {})
-		var v2 := UiKit.vbox(6)
-		var h2 := UiKit.hbox(8)
+		var v2 := UiKit.vbox(UiTheme.GAP_IN)
+		var h2 := UiKit.hbox(UiTheme.GAP_ROW)
 		h2.add_child(Icon.make(String(UiText.ROLE_ICONS.get(role, "worker")), 38, UiTheme.TEXT, UiTheme.GOLD))
 		var l := UiKit.label("", "Small")
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -119,19 +121,21 @@ func build() -> void:
 		v2.add_child(hb)
 		for w in s.workers_at("depth:%d" % d, role):
 			var wid := int(w["id"])
-			v2.add_child(UiKit.button("%s  (Lv %d)" % [String(w["name"]), int(w["level"])], func() -> void: open("worker", {"worker": wid}), "Chip", 60))
+			var wb := UiKit.two_line_button("", "", func() -> void: open("worker", {"worker": wid}), "Chip", 80)
+			v2.add_child(wb)
+			_crew_rows.append([wid, wb])
 		content.add_child(UiKit.card(v2))
 		_hire[role] = {"label": l, "button": hb, "name": String(r.get("plural", role))}
 		anchor("depth_hire_%s" % role, hb)
 	section("Veins")
-	_veins = UiKit.vbox(8)
+	_veins = UiKit.vbox(UiTheme.GAP_IN)
 	_veins_sig = ""
-	content.add_child(_veins)
+	content.add_child(UiKit.card(_veins))
 
 
 func _build_locked(s: Simulation, dd: Dictionary) -> void:
 	var why := SimCommands.depth_unlockable(s, d)
-	var v := UiKit.vbox(6)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
 	var res: Array = []
 	for rid in dd.get("resources", {}):
 		var r: Dictionary = s.content.resource_by_id.get(String(rid), {})
@@ -145,17 +149,17 @@ func _build_locked(s: Simulation, dd: Dictionary) -> void:
 	v.add_child(UiKit.kv("Hazards", ", ".join(PackedStringArray(hn)) if not hn.is_empty() else "None"))
 	for h in hz:
 		v.add_child(UiKit.wrap(String(s.content.hazards.get(String(h), {}).get("description", ""))))
-	content.add_child(UiKit.card(v))
-	if why == "" :
+	if why == "":
 		_unlock_button = CostButton.make("Dig to %s" % String(dd.get("name", "")), func() -> void:
 			var r2 := cmd({"type": "unlock_depth", "depth": d})
 			if r2.get("ok", false):
 				close()
 				if ui.main:
 					ui.main.camera_rig().focus_target("depth:%d" % d))
-		content.add_child(_unlock_button)
+		v.add_child(_unlock_button)
 	else:
-		content.add_child(UiKit.wrap(String(UiRoot.ERRORS.get(why, why.capitalize())), "Small"))
+		v.add_child(UiKit.wrap(String(UiRoot.ERRORS.get(why, why.capitalize())), "Small"))
+	content.add_child(UiKit.card(v))
 
 
 func refresh() -> void:
@@ -243,6 +247,12 @@ func refresh() -> void:
 		else:
 			var hc := Economy.hire_cost(s, String(role))
 			hb.set_cost(hb.title_label.text if hb.title_label.text.begins_with("Hire") else "Hire", hc, s.state.money >= hc)
+	for pair in _crew_rows:
+		var w := s.worker_by_id(int(pair[0]))
+		if not w.is_empty():
+			var ls := UiKit.line_labels(pair[1] as Button)
+			(ls[0] as Label).text = "%s  (Lv %d)" % [String(w["name"]), int(w["level"])]
+			(ls[1] as Label).text = UiText.worker_status(s, w)
 	_refresh_veins(s, dep)
 
 
@@ -259,7 +269,7 @@ func _refresh_veins(s: Simulation, dep: Dictionary) -> void:
 		UiKit.clear(_veins)
 		for n in dep["nodes"]:
 			var r: Dictionary = s.content.resource_by_id.get(String(n["resource"]), {})
-			var h := UiKit.hbox(10)
+			var h := UiKit.hbox(UiTheme.GAP_ROW)
 			h.add_child(Icon.make("gem", 38, UiTheme.TEXT, Color(String(r.get("color", "#cccccc")))))
 			var v := UiKit.vbox(2)
 			v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -276,7 +286,9 @@ func _refresh_veins(s: Simulation, dep: Dictionary) -> void:
 				bar = UiKit.progress(0.0, float(n["max_hp"]), "GreenBar", 12)
 				v.add_child(bar)
 			h.add_child(v)
-			var price := UiKit.label("", "Caption")
+			# A fixed price column keeps every vein's bar the same length.
+			var price := UiKit.label("", "Caption", HORIZONTAL_ALIGNMENT_RIGHT)
+			price.custom_minimum_size.x = 96
 			h.add_child(price)
 			_veins.add_child(h)
 			_vein_rows.append({"timer": timer, "bar": bar, "price": price})

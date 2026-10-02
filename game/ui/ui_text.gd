@@ -12,7 +12,7 @@ const STATS := {
 }
 
 const JOBS := {
-	"mine": "Mining", "haul": "Hauling ore", "operate": "Operating", "repair": "Repairing", "research": "Researching",
+	"mine": "Mining", "haul": "Hauling ore", "operate": "Operating", "repair": "Repairing", "service": "Servicing", "research": "Researching",
 	"survey": "Surveying veins", "supervise": "Supervising", "manage": "Managing sales", "idle": "Waiting",
 }
 
@@ -89,7 +89,18 @@ static func worker_status(sim: Simulation, w: Dictionary) -> String:
 		return "Idle - " + String(IDLE_REASONS[String(w["target"])])
 	if float(w.get("arrive_at", 0.0)) > sim.state.run_time:
 		return "Walking to %s" % location(sim, String(w["location"]))
+	if job == "service" and String(w.get("target", "")) == "workshop":
+		return "Fetching parts at the Workshop"
 	return "%s at %s" % [txt, location(sim, String(w["location"]))]
+
+
+## The next step when power is short: upgrade, build or research the generator.
+static func power_fix(sim: Simulation) -> String:
+	if sim.facility_built("generator"):
+		return "Upgrade the Diesel Generator"
+	if SimCommands.facility_requirement_met(sim, "generator"):
+		return "Build the Diesel Generator"
+	return "Research Diesel Power"
 
 
 static func effect(sim: Simulation, e: Dictionary) -> String:

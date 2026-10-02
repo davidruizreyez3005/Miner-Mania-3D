@@ -202,7 +202,7 @@ func execute(cmd: Dictionary) -> Dictionary:
 
 
 func emit(type: String, data: Dictionary = {}) -> void:
-	if offline_mode and type in ["node_depleted", "node_respawned", "repair_done", "truck_trip"]:
+	if offline_mode and type in ["node_depleted", "node_respawned", "repair_done", "truck_trip", "power_short"]:
 		return
 	var ev := data.duplicate()
 	ev["type"] = type

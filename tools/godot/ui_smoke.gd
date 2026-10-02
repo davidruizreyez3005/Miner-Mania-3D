@@ -11,6 +11,7 @@ extends SceneTree
 ##   godot --headless --path . --script res://tools/godot/ui_smoke.gd -- [--shots <dir>] [--report <path>]
 
 const PANELS := [["depth", {"depth": 1}], ["facility", {"facility": "headframe"}], ["facility", {"facility": "crusher"}],
+	["facility", {"facility": "generator"}], ["facility", {"facility": "workshop"}],
 	["crew", {}], ["research", {}], ["quests", {}], ["quests", {"tab": "achievements"}], ["stats", {}], ["codex", {}],
 	["prestige", {}], ["cosmetics", {}], ["settings", {}], ["more", {}], ["pause", {}], ["worker", {"worker": 1}],
 	["discovery", {"resource": "gold", "depth": 3}]]
@@ -187,6 +188,7 @@ func _run() -> void:
 	await _scroll_by_touch(ui)
 	await _camera_by_touch()
 	await _switch_quality()
+	await _panel_layout(ui)
 	# Memory: opening and closing every panel again and again must not leave
 	# objects or orphan nodes behind (the first pass warms the caches).
 	var counts: Array = []
@@ -445,6 +447,59 @@ func _camera_by_touch() -> void:
 	if absf(fwd.x) > 0.01:
 		failures.append("a two-finger twist turned the camera (forward %s)" % str(fwd))
 	log_lines.append("camera_by_touch")
+
+
+## Upgrade panels are laid out on one spacing scale: equal margins left and
+## right (the scroll bar keeps its own lane), the same gap between every
+## block, upgrade buttons of equal width - whether the list scrolls or not.
+func _panel_layout(ui) -> void:
+	ui.close_all()
+	await _frames(10)
+	var widths := {}
+	for p in [["facility", {"facility": "headframe"}], ["facility", {"facility": "generator"}], ["depth", {"depth": 1}]]:
+		var panel = ui.open_panel(String(p[0]), p[1])
+		await _frames(24)
+		var name := "%s %s" % [p[0], str(p[1].values()[0])]
+		if panel == null:
+			failures.append("layout: %s did not open" % name)
+			continue
+		var frame: Rect2 = panel.frame.get_global_rect()
+		var box: Rect2 = panel.content.get_global_rect()
+		var left := box.position.x - frame.position.x
+		var right := frame.end.x - box.end.x
+		if absf(left - right) > 2.0:
+			failures.append("layout: %s margins differ (left %.0f, right %.0f)" % [name, left, right])
+		widths[name] = box.size.x
+		var prev_end := -1.0
+		for c in panel.content.get_children():
+			var ctl := c as Control
+			if ctl == null or not ctl.visible:
+				continue
+			var r := ctl.get_global_rect()
+			if prev_end >= 0.0 and absf(r.position.y - prev_end - float(UiTheme.GAP)) > 1.5:
+				failures.append("layout: %s gap of %.0f px before %s (expected %d)" % [name, r.position.y - prev_end, ctl.get_class(), UiTheme.GAP])
+			prev_end = r.end.y
+		var rows := 0
+		for b in panel.content.find_children("*", "CostButton", true, false):
+			var row := (b as Control).get_parent() as HBoxContainer
+			if row == null or row.get_child_count() != 3:
+				continue
+			rows += 1
+			var w0 := (row.get_child(0) as Control).size.x
+			for k in 3:
+				if absf((row.get_child(k) as Control).size.x - w0) > 1.0:
+					failures.append("layout: %s upgrade buttons of different widths" % name)
+			break
+		if p[0] != "facility" or String(p[1]["facility"]) != "generator":
+			if rows == 0:
+				failures.append("layout: %s has no upgrade button row" % name)
+		await _shot("layout_%s" % name.replace(" ", "_"))
+		ui.close_panel(panel)
+		await _frames(8)
+	var vals := widths.values()
+	if vals.size() == 3 and (absf(float(vals[0]) - float(vals[1])) > 1.0 or absf(float(vals[0]) - float(vals[2])) > 1.0):
+		failures.append("layout: content width changes between scrolling and short panels: %s" % str(widths))
+	log_lines.append("panel_layout_even")
 
 
 ## Graphics presets switch live in the open mine (Settings > Graphics).

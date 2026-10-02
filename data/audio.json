@@ -44,6 +44,7 @@
     "repair_done": {"sound": "repair"},
     "manual_repair": {"sound": "repair", "haptic": 15},
     "machine_worn": {"sound": "ui_alert"},
+    "power_short": {"sound": "ui_alert"},
     "upgrade_bought": {"sound": "ui_upgrade", "haptic": 10},
     "tool_upgraded": {"sound": "construct", "haptic": 40},
     "worker_hired": {"sound": "ui_hire", "haptic": 10},

@@ -228,6 +228,12 @@ func _y(level: int, p: Vector3) -> Vector3:
 	return Vector3(p.x, nav.floor_y(level, p.x, p.z), p.z)
 
 
+## `p` moved onto the nearest walkable cell of `level` (at floor height).
+func _snap(level: int, p: Vector3) -> Vector3:
+	var sn := nav.grid(level).snap(Vector2(p.x, p.z))
+	return _y(level, Vector3(sn.x, 0, sn.y))
+
+
 ## A free spot near `p` for the k-th person there (rings of 0.9 m).
 func _spread(level: int, p: Vector3, k: int) -> Vector3:
 	if k <= 0:
@@ -279,10 +285,9 @@ func spot_for(_a: Agent, w: Dictionary) -> Dictionary:
 			look = fv.global_position + Vector3(0, 1.2, 0)
 		else:
 			t = Transform3D(Basis(), sim.layout.position(loc))
-		var p := t.origin
-		if k > 0:
-			p = _spread(0, p, k)
-		p = _y(0, p)
+		# On the walkable ground (a socket can sit on a machine's edge), the
+		# k-th person there a step aside.
+		var p := _spread(0, t.origin, k) if k > 0 else _snap(0, t.origin)
 		return {"pos": p, "yaw": _yaw_of(t), "level": 0, "look": look}
 	if loc == "surface:rest":
 		return _rest_spot(0, k)

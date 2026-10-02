@@ -32,7 +32,7 @@ func build() -> void:
 	content.add_child(_slider("camera_sensitivity", "Camera speed", 0.5, 2.0))
 	content.add_child(_toggle("tutorial_enabled", "Show tips"))
 	section("Graphics")
-	var q := UiKit.hbox(8)
+	var q := UiKit.hbox(UiTheme.GAP_ROW)
 	for i in 3:
 		var b := UiKit.button(String(GraphicsQuality.value(i, "name", ["Low", "Medium", "High"][i])), func() -> void:
 			Settings.choose_quality(i)
@@ -42,7 +42,7 @@ func build() -> void:
 	content.add_child(q)
 	content.add_child(UiKit.wrap("Low is made for entry-level phones: lower 3D resolution, simpler lighting and scenery, 30 FPS." +
 		(" Chosen automatically for this phone - it steps down by itself if the game cannot keep up." if bool(Settings.get_value("quality_auto", true)) else "")))
-	var f := UiKit.hbox(8)
+	var f := UiKit.hbox(UiTheme.GAP_ROW)
 	for fps in [30, 60]:
 		var b2 := UiKit.button("%d FPS" % fps, func() -> void:
 			Settings.set_value("fps_limit", fps)

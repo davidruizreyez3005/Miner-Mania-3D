@@ -49,8 +49,8 @@ func build() -> void:
 func _tech_card(s: Simulation, t: Dictionary) -> Control:
 	var tid := String(t["id"])
 	var done := s.state.techs.has(tid)
-	var v := UiKit.vbox(6)
-	var h := UiKit.hbox(10)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
+	var h := UiKit.hbox(UiTheme.GAP_ROW)
 	h.add_child(Icon.make("check" if done else ("flask" if SimCommands.tech_available(s, tid) else "lock"), 40, UiTheme.TEXT, UiTheme.GREEN))
 	var n := UiKit.label(String(t.get("name", tid)), "Small")
 	n.add_theme_font_override("font", UiTheme.bold_font())

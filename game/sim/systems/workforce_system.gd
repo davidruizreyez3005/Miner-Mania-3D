@@ -3,13 +3,14 @@ extends RefCounted
 ## Worker AI at the simulation level. Every job interval each worker's post
 ## (home assignment) plus the current production needs decide its job:
 ## miners take free rock faces, haulers only move when there is ore to move,
-## operators run machines that have input, mechanics go to the most worn
-## machine, and anyone with nothing to do idles (or rests when tired).
-## Changing location costs real travel time (walking + riding the cage),
-## during which the worker produces nothing. Scales linearly with workforce;
-## no per-frame work.
+## operators run machines that have input, mechanics rush to machines that
+## need work and otherwise walk their service round (every machine in turn,
+## topping it up to full condition, and back to the workshop), and anyone
+## with nothing to do idles (or rests when tired). Changing location costs
+## real travel time (walking + riding the cage), during which the worker
+## produces nothing. Scales linearly with workforce; no per-frame work.
 
-const PRODUCTIVE := ["mine", "haul", "operate", "repair", "research", "survey", "manage", "supervise"]
+const PRODUCTIVE := ["mine", "haul", "operate", "repair", "service", "research", "survey", "manage", "supervise"]
 
 static var _post_cache: Dictionary = {}
 
@@ -56,7 +57,7 @@ static func update_crews(sim: Simulation, dt: float = 0.0) -> void:
 		if not crew.has(post):
 			crew[post] = {}
 		crew[post][w["role"]] = float(crew[post].get(w["role"], 0.0)) + e
-		if w["job"] == "repair":
+		if w["job"] == "repair" or w["job"] == "service":
 			repair[w["target"]] = float(repair.get(w["target"], 0.0)) + e
 	sim.rt["crew"] = crew
 	sim.rt["repair_crew"] = repair
@@ -102,15 +103,17 @@ static func rest_location(sim: Simulation, w: Dictionary) -> String:
 	return "surface:rest"
 
 
+## Machines that need a mechanic now (below the service mark, or flagged
+## worn), most worn first.
 static func repair_queue(sim: Simulation) -> Array:
-	var threshold := float(sim.content.bal("condition", "repair_threshold", 0.8))
+	var service_at := float(sim.content.bal("condition", "service_at", 0.97))
 	var q := []
 	var ids := sim.state.facilities.keys()
 	ids.sort()
 	for fid in ids:
 		var fs: Dictionary = sim.state.facilities[fid]
 		var fac := sim.content.facility(fid)
-		if fs.get("built", false) and fac.get("repairable", false) and (float(fs["condition"]) < threshold or fs.get("repairing", false)):
+		if fs.get("built", false) and fac.get("repairable", false) and (float(fs["condition"]) < service_at or fs.get("repairing", false)):
 			q.append(fid)
 	q.sort_custom(func(a, b):
 		var ca := float(sim.state.facilities[a]["condition"])
@@ -119,17 +122,68 @@ static func repair_queue(sim: Simulation) -> Array:
 	return q
 
 
+## The mechanics' service round: the workshop (parts), then every built
+## machine that wears, in camp order.
+static func service_stops(sim: Simulation) -> Array:
+	var out := []
+	if sim.facility_built("workshop"):
+		out.append("workshop")
+	for fac in sim.content.facilities:
+		if fac.get("repairable", false) and sim.facility_built(String(fac["id"])):
+			out.append(String(fac["id"]))
+	return out
+
+
+## Where a mechanic works on `fid`: the machine's repair spot, or the bench.
+static func service_location(fid: String) -> String:
+	return "facility:workshop" if fid == "workshop" else "facility:%s:repair" % fid
+
+
+## A service stop is done once the mechanic has spent the service time
+## there and the machine is back in full condition.
+static func stop_done(sim: Simulation, w: Dictionary) -> bool:
+	if sim.state.run_time < float(w["arrive_at"]) + float(sim.content.bal("condition", "service_s", 6.0)):
+		return false
+	return _serviced(sim, String(w["target"]))
+
+
+## True when `fid` needs nothing more (full condition, or not a machine).
+static func _serviced(sim: Simulation, fid: String) -> bool:
+	if not sim.content.facility(fid).get("repairable", false):
+		return true
+	return float(sim.state.facilities.get(fid, {}).get("condition", 1.0)) >= float(sim.content.bal("condition", "repaired_at", 0.999))
+
+
+## A mechanic's job in hand is finished: the repaired machine is back in
+## full condition, or the service stop is done.
+static func _mechanic_done(sim: Simulation, w: Dictionary) -> bool:
+	match String(w["job"]):
+		"repair":
+			return _serviced(sim, String(w["target"]))
+		"service":
+			return stop_done(sim, w)
+	return true
+
+
+static func _round_due(sim: Simulation) -> bool:
+	for w in sim.state.workers:
+		if w["role"] == "mechanic" and not w["resting"] and (w["job"] == "repair" or w["job"] == "service") and _mechanic_done(sim, w):
+			return true
+	return false
+
+
 ## Re-decides every worker's job. Skipped when nothing that influences a
-## decision changed since the last pass (steady state), unless forced.
+## decision changed since the last pass (steady state) and no mechanic has
+## finished a stop of the service round, unless forced.
 static func assign_jobs(sim: Simulation, force: bool = false) -> void:
 	var queue := repair_queue(sim)
 	var ctx := _context(sim)
 	var sig := _signature(sim, ctx, queue)
-	if not force and not sim.rt.get("jobs_dirty", true) and sim.rt.get("job_sig", "") == sig:
+	if not force and not sim.rt.get("jobs_dirty", true) and sim.rt.get("job_sig", "") == sig and not _round_due(sim):
 		return
 	sim.rt["job_sig"] = sig
 	sim.rt["jobs_dirty"] = false
-	var taken := {"_ctx": ctx}
+	var taken := {"_ctx": ctx, "_claims": _mechanic_claims(sim)}
 	var miner_index := {}
 	# Miners keep their vein while it stays active; displaced miners go to the
 	# least crowded active vein (ties: lowest slot). Few walks when a vein
@@ -239,11 +293,7 @@ static func desired_job(sim: Simulation, w: Dictionary, queue: Array, taken: Dic
 				return ["operate", post, "facility:" + post]
 			return ["idle", post, "facility:" + post]
 		"mechanic":
-			for fid in queue:
-				if not taken.has(String(fid)):
-					taken[fid] = true
-					return ["repair", fid, "facility:%s:repair" % fid]
-			return ["idle", "", "facility:workshop" if sim.facility_built("workshop") else "surface:rest"]
+			return _mechanic_job(sim, w, queue, taken)
 		"engineer":
 			if ctx["research"]:
 				return ["research", "office", "facility:office"]
@@ -254,6 +304,52 @@ static func desired_job(sim: Simulation, w: Dictionary, queue: Array, taken: Dic
 			if post == "plant":
 				return ["supervise", "plant", "plant"]
 	return ["idle", "", "surface:rest"]
+
+
+## What each mechanic is busy with and keeps until it is finished: a
+## repair (until the machine is back in full condition) or a service stop.
+## Claimed before anyone is assigned, so mechanics never swap machines with
+## each other mid-job.
+static func _mechanic_claims(sim: Simulation) -> Dictionary:
+	var claims := {}
+	for w in sim.state.workers:
+		if w["role"] != "mechanic" or w["resting"] or not (w["job"] == "repair" or w["job"] == "service"):
+			continue
+		var fid := String(w["target"])
+		if not claims.has(fid) and not _mechanic_done(sim, w):
+			claims[fid] = int(w["id"])
+	return claims
+
+
+## Mechanics: finish the job in hand, rush to a machine that needs work and
+## has nobody on it, else walk on to the next stop of the service round.
+static func _mechanic_job(sim: Simulation, w: Dictionary, queue: Array, taken: Dictionary) -> Array:
+	var claims: Dictionary = taken.get_or_add("_claims", {})
+	var me := int(w["id"])
+	var cur := String(w["target"])
+	var mine := int(claims.get(cur, -1)) == me
+	if mine and (w["job"] == "repair" or cur in queue):
+		return ["repair", cur, service_location(cur)]
+	for fid in queue:
+		if not claims.has(String(fid)):
+			if mine:
+				claims.erase(cur)
+			claims[String(fid)] = me
+			return ["repair", fid, service_location(String(fid))]
+	if mine:
+		return ["service", cur, service_location(cur)]
+	var stops := service_stops(sim)
+	if stops.is_empty():
+		return ["idle", "", "surface:rest"]
+	var n := stops.size()
+	var i := stops.find(cur)
+	var start := (i + 1) % n if i >= 0 else me % n
+	for k in n:
+		var st := String(stops[(start + k) % n])
+		if not claims.has(st):
+			claims[st] = me
+			return ["service", st, service_location(st)]
+	return ["service", String(stops[start]), service_location(String(stops[start]))]
 
 
 static func _apply(sim: Simulation, w: Dictionary, job: Array) -> void:

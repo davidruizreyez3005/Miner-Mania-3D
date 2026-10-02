@@ -25,6 +25,18 @@ const RARITY := {"common": Color("c8c2b4"), "uncommon": Color("7fd46a"), "rare":
 
 const FONT_SIZE := 26
 
+## One spacing scale for every panel (px at the 720 px base width): between
+## the blocks of a panel, inside a card, between the buttons of a row. A
+## card's padding equals GAP, so space reads the same inside and between.
+const GAP := 16
+const GAP_IN := 10
+const GAP_ROW := 10
+## The scroll bar's lane on the right of a scrolling panel (bar + gap). The
+## frames take it out of their right margin, so content keeps equal margins
+## left and right whether or not the bar shows.
+const SCROLL_BAR := 8
+const GUTTER := 16
+
 static var _theme: Theme
 static var _bold: FontVariation
 
@@ -70,16 +82,17 @@ static func get_theme() -> Theme:
 	t.set_stylebox("panel", "PanelContainer", box(PANEL, 26, 18))
 	t.add_type("Card")
 	t.set_type_variation("Card", "PanelContainer")
-	t.set_stylebox("panel", "Card", box(CARD, 20, 16))
+	t.set_stylebox("panel", "Card", box(CARD, 20, GAP))
 	t.add_type("CardHi")
 	t.set_type_variation("CardHi", "PanelContainer")
-	t.set_stylebox("panel", "CardHi", box(CARD_HI, 20, 16, GOLD, 3))
+	t.set_stylebox("panel", "CardHi", box(CARD_HI, 20, GAP, GOLD, 3))
 	t.add_type("Bar")
 	t.set_type_variation("Bar", "PanelContainer")
 	t.set_stylebox("panel", "Bar", box(Color(0.07, 0.08, 0.1, 0.82), 22, 10))
 	t.add_type("Sheet")
 	t.set_type_variation("Sheet", "PanelContainer")
 	var sheet := box(Color(PANEL, 0.97), 30, 20)
+	sheet.content_margin_right = 20 - GUTTER
 	sheet.corner_radius_bottom_left = 0
 	sheet.corner_radius_bottom_right = 0
 	sheet.shadow_color = Color(0, 0, 0, 0.45)
@@ -115,8 +128,13 @@ static func get_theme() -> Theme:
 	t.set_icon("grabber", "HSlider", _dot(34, GOLD))
 	t.set_icon("grabber_highlight", "HSlider", _dot(38, Color("ffd26a")))
 	t.set_color("font_color", "CheckButton", TEXT)
-	# Scroll bars: slim.
-	t.set_stylebox("scroll", "VScrollBar", box(Color(0, 0, 0, 0.0), 4, 2))
+	# Scroll bars: slim, in their own lane (GUTTER) beside the content.
+	var lane := box(Color(0, 0, 0, 0.0), 4, 2)
+	lane.content_margin_left = SCROLL_BAR * 0.5
+	lane.content_margin_right = SCROLL_BAR * 0.5
+	t.set_stylebox("scroll", "VScrollBar", lane)
+	# (h = the horizontal space between the content and the vertical bar)
+	t.set_constant("scrollbar_h_separation", "ScrollContainer", GUTTER - SCROLL_BAR)
 	t.set_stylebox("grabber", "VScrollBar", box(Color(1, 1, 1, 0.18), 4, 2))
 	t.set_stylebox("grabber_highlight", "VScrollBar", box(Color(1, 1, 1, 0.3), 4, 2))
 	t.set_stylebox("grabber_pressed", "VScrollBar", box(Color(1, 1, 1, 0.3), 4, 2))

@@ -49,10 +49,23 @@
   "manual_trips_max": 3
  },
  "power": {
-  "grid_kw": 30.0
+  "_comment": "The grid's supply (enough for the belt, the crusher and the washer at full load) plus the generator's output feed the loads in this order (any other powered facility after them). A load the supply does not fully reach runs at the share it gets; ore it cannot take bypasses it.",
+  "grid_kw": 65.0,
+  "priority": [
+   "conveyor",
+   "pump",
+   "crusher",
+   "washer",
+   "sorter",
+   "smelter",
+   "refinery"
+  ]
  },
  "condition": {
+  "_comment": "Below repair_threshold a machine is worn (smoke, warning). Mechanics rush to anything below service_at, otherwise walk their service round: service_s at each stop, leaving it in full condition.",
   "repair_threshold": 0.8,
+  "service_at": 0.97,
+  "service_s": 6.0,
   "min_factor": 0.4,
   "repaired_at": 0.999,
   "manual_repair": 0.25

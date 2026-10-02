@@ -34,7 +34,7 @@ func build() -> void:
 	var money := UiKit.label("+" + Num.money(float(r.get("earned", 0.0))), "Big")
 	money.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(UiKit.card(money, "CardHi"))
-	var v := UiKit.vbox(6)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
 	v.add_child(UiKit.label("Resources mined", "Accent"))
 	var mined: Dictionary = r.get("mined", {})
 	if mined.is_empty():
@@ -43,7 +43,7 @@ func build() -> void:
 	keys.sort_custom(func(a: String, b: String) -> bool: return float(mined[a]) > float(mined[b]))
 	for k in keys:
 		var res: Dictionary = s.content.resource_by_id.get(String(k), {})
-		var h := UiKit.hbox(10)
+		var h := UiKit.hbox(UiTheme.GAP_ROW)
 		h.add_child(Icon.make("gem", 32, UiTheme.TEXT, Color(String(res.get("color", "#cccccc")))))
 		var n := UiKit.label(String(res.get("name", k)), "Small")
 		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -57,7 +57,7 @@ func build() -> void:
 	content.add_child(UiKit.card(v))
 	var disc: Array = r.get("discoveries", [])
 	if not disc.is_empty():
-		var dv := UiKit.vbox(6)
+		var dv := UiKit.vbox(UiTheme.GAP_IN)
 		dv.add_child(UiKit.label("Rare discoveries", "Accent"))
 		for rid in disc:
 			var res2: Dictionary = s.content.resource_by_id.get(String(rid), {})

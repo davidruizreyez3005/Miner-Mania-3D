@@ -62,6 +62,18 @@ maintenance, progression. Rules that matter:
   seconds of upstream throughput, so upgrades keep flows balanced.
 - **Soft chokepoints**: ore that a processing machine cannot take bypasses it
   and sells for less - production never deadlocks.
+- **Power in line order**: the grid (65 kW: the belt, the crusher and the
+  washer at full load) plus the Diesel Generator's output feed the loads in
+  `balance.power.priority` order - the belt and the pumps first, then the
+  machines along the line. A machine the supply does not fully reach runs
+  at the share it gets (`UtilitySystem.power_factor`), so building a new
+  machine never slows the belt or the machines already running; the player
+  is told which machine is short (`power_short`).
+- **Wear and mechanics**: working machines wear and run slower. Mechanics
+  walk a service round (the workshop for parts, then every machine that
+  wears: `service_s` at each stop, leaving it in full condition) and drop it
+  for any machine below `service_at`, claiming jobs so two never swap
+  machines; every 20 % of condition they restore counts as a repair.
 - **Automation stages** (Manual, Semi-Automated, Automated, Industrial) come
   from what runs without the player: miners, lift operators, sales managers,
   self-running machines.
@@ -146,8 +158,10 @@ hired worker (pooled) and the player's `Foreman`:
 - A worker reads its simulation record (job, target, location, arrival time,
   resting) and acts it out: walks and rides the cage to arrive about when
   the simulation says, then mines with the tier's tool (pick, jackhammer),
-  hauls sacks between the face and the station, operates, repairs,
-  surveys, supervises or rests on a bench.
+  hauls sacks between the face and the station, operates, services and
+  repairs machines (wrench and hammer while a machine needs work, a
+  look-over once it is in shape), surveys, supervises or rests on a bench.
+  Work spots snap onto the walkable grid.
 - The foreman walks where you tap and swings at the vein you tap; each
   swing's impact frame sends `manual_swing` through the Session, so the
   animation and the income are one.
@@ -183,6 +197,17 @@ production flow (with the current bottleneck), prestige, outfits, settings,
 more, pause; popups: WHILE YOU WERE AWAY, discoveries, confirmations. Toasts,
 floating "+ore" texts and the tutorial coach complete it. Features appear as
 the game introduces them.
+
+Panels share one spacing scale (`UiTheme.GAP` between blocks, `GAP_IN`
+inside a card - equal to a card's padding - and `GAP_ROW` between the
+buttons of a row) and a facility reads as a column of cards: upgrade (level,
+stats now > next, +1 / +10 / MAX, the next look), condition, power (the grid
+and the generator, what the machine draws and whether the supply reaches
+it), crew (operators, or the workshop's mechanics and what each is doing)
+and a live readout with the facility's actions. The scroll bar has its own
+lane (`GUTTER`, ScrollContainer reserve mode) taken out of the frame's right
+margin, so content keeps equal margins and the same width whether or not a
+list scrolls; the smoke test checks margins, gaps and button widths.
 
 Every panel's list is a `TouchScroll`: a drag scrolls it wherever the finger
 lands. Godot only scrolls a ScrollContainer by touch when the drag reaches

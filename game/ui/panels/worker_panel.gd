@@ -38,7 +38,7 @@ func build() -> void:
 		return
 	var role: Dictionary = s.content.role_by_id.get(String(w["role"]), {})
 	EventBus.selection_changed.emit("worker:%d" % wid)
-	var v := UiKit.vbox(6)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
 	v.add_child(UiKit.kv("Role", String(role.get("name", w["role"])), "Accent"))
 	v.add_child(UiKit.kv("Posted at", UiText.post(s, String(w["post"]))))
 	_status = UiKit.wrap("", "Small")
@@ -51,7 +51,7 @@ func build() -> void:
 	_energy = UiKit.progress(1, 1, "GreenBar", 12)
 	v.add_child(_energy)
 	content.add_child(UiKit.card(v))
-	var row := UiKit.hbox(10)
+	var row := UiKit.hbox(UiTheme.GAP_ROW)
 	var follow := UiKit.button("Follow", func() -> void:
 		if ui.main:
 			ui.main.camera_rig().focus_target("worker:%d" % wid)

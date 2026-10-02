@@ -151,7 +151,7 @@
    "tier": 2,
    "column": 3,
    "rp": 65,
-   "cost": 7000,
+   "cost": 3000,
    "requires": [
     "crushing"
    ],
@@ -161,7 +161,7 @@
      "what": "facility:generator"
     }
    ],
-   "description": "Unlocks the Diesel Generator. The grid alone cannot feed a real plant."
+   "description": "Unlocks the Diesel Generator: its output adds to the grid's, so the whole plant can run."
   },
   {
    "id": "workshop_tools",

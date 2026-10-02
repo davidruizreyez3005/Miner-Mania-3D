@@ -92,6 +92,9 @@ func test_navigation_reaches_every_stop() -> void:
 				stops.append([loc, w.layout.position(loc)])
 			for fid in w.facility_views:
 				stops.append(["facility:" + fid, (w.facility_views[fid] as FacilityView).work_transform("operate").origin])
+				if content().facility(fid).get("repairable", false):
+					stops.append(["facility:%s:repair" % fid, (w.facility_views[fid] as FacilityView).work_transform("repair").origin])
+			stops.append(["facility:headframe:repair", w.lift_view.work_transform("repair").origin])
 		else:
 			for loc in ["station", "rest", "face"]:
 				stops.append([loc, w.layout.position("depth:%d:%s" % [lvl, loc])])
@@ -120,6 +123,33 @@ func test_cage_route_between_levels() -> void:
 	assert_true(t > 10.0 and t < 200.0, "route time %.1f s" % t)
 	var sim_t := w.layout.travel_time("surface:rest", "depth:8:node:0")
 	assert_true(absf(t - sim_t) < sim_t * 0.6 + 8.0, "visual route (%.1f s) close to the simulation's travel time (%.1f s)" % [t, sim_t])
+
+
+func test_mechanic_walks_between_machines() -> void:
+	## The mechanic is seen walking its service round: it reaches several
+	## different machines across the camp, and works at each one.
+	var w := _world_full()
+	var mech: WorkerAgent = null
+	for a in w.agents.agents.values():
+		if (a as WorkerAgent).role == "mechanic":
+			mech = a
+	if not assert_true(mech != null, "a mechanic agent exists"):
+		return
+	var spots: Array = []
+	var worked := {}
+	for i in 1800:
+		w.sim.tick(0.1)
+		w.sync(0.1)
+		if not mech.moving and mech.activity in ["service", "repair"]:
+			worked[String(mech.record["target"])] = true
+			var p := mech.position
+			var seen := false
+			for q in spots:
+				seen = seen or (q as Vector3).distance_to(p) < 3.0
+			if not seen:
+				spots.append(p)
+	assert_ge(float(worked.size()), 3.0, "worked at several stops: %s" % str(worked.keys()))
+	assert_ge(float(spots.size()), 3.0, "stood at several places across the camp (%d)" % spots.size())
 
 
 func test_agents_follow_simulation() -> void:
@@ -239,18 +269,27 @@ func test_camera_drags_follow_the_finger() -> void:
 
 
 func _triangles(root: Node, budget_nodes: Array) -> int:
+	budget_nodes.append(root.name)
+	return _tris_under(root)
+
+
+## Triangles drawn under `n`. Subtrees queued for deletion are skipped: the
+## tests run simulation ticks without engine frames, so a vein model that
+## regrew as another ore is freed only at the end of the frame.
+static func _tris_under(n: Node) -> int:
+	if n.is_queued_for_deletion():
+		return 0
 	var tri := 0
-	for n in root.find_children("*", "GeometryInstance3D", true, false):
-		var gi := n as GeometryInstance3D
-		if gi.visibility_range_begin > 0.0:
-			continue                              # a distant LOD level
+	var gi := n as GeometryInstance3D
+	if gi != null and gi.visibility_range_begin <= 0.0:          # (> 0: a distant LOD level)
 		if gi is MultiMeshInstance3D:
 			var mm := (gi as MultiMeshInstance3D).multimesh
 			if mm and mm.mesh:
 				tri += _mesh_tris(mm.mesh) * mm.instance_count
 		elif gi is MeshInstance3D and (gi as MeshInstance3D).mesh:
 			tri += _mesh_tris((gi as MeshInstance3D).mesh)
-	budget_nodes.append(root.name)
+	for c in n.get_children():
+		tri += _tris_under(c)
 	return tri
 
 

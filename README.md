@@ -24,7 +24,9 @@ is built, tested and exported to an APK by GitHub Actions.
   are, with animated tools and props.
 - **Economy**: a deterministic production chain (mining -> haulage -> lift
   -> silos -> processing -> warehouse -> trucks) with upgrades, milestones,
-  wear and repairs, power, research (33 technologies), 40 quests, delivery
+  wear and mechanics on service rounds, power (the grid plus a generator,
+  fed along the line so a new machine never slows the running ones),
+  research (33 technologies), 40 quests, delivery
   contracts, 36 achievements, a discovery codex, prestige with legacy
   upgrades and four regions, outfits.
 - **Idle for real**: offline progress is simulated on load (capped and

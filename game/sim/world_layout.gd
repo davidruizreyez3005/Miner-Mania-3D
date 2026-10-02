@@ -6,7 +6,7 @@ extends RefCounted
 ## what the economy assumes.
 ##
 ## Location ids:
-##   surface:landing | surface:rest | plant | facility:<id>
+##   surface:landing | surface:rest | plant | facility:<id> | facility:<id>:repair
 ##   depth:<d>:landing | depth:<d>:station | depth:<d>:rest | depth:<d>:face | depth:<d>:node:<slot>
 
 var content: ContentDB
@@ -71,8 +71,9 @@ func position(loc: String) -> Vector3:
 			if pl.is_empty():
 				p = _v(surf.get("plant", [0, -16]), surface_y)
 			else:
+				# facility:<id> is the operator's spot, facility:<id>:repair the mechanic's.
 				var base := _v(pl.get("pos", [0, 0]), surface_y)
-				var work: Array = pl.get("work", [0, 0])
+				var work: Array = pl.get("repair" if parts.size() > 2 and parts[2] == "repair" else "work", pl.get("work", [0, 0]))
 				p = base + Vector3(float(work[0]), 0.0, float(work[1]))
 		"depth":
 			var d := int(parts[1])

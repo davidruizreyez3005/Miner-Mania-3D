@@ -14,6 +14,9 @@ const DEADZONE := 16
 
 func _init() -> void:
 	horizontal_scroll_mode = SCROLL_MODE_DISABLED
+	# The bar keeps its lane even while hidden: the content's width (and so
+	# the panel's margins) never changes when a list starts to scroll.
+	vertical_scroll_mode = SCROLL_MODE_RESERVE
 	scroll_deadzone = DEADZONE
 
 

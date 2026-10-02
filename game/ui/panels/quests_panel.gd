@@ -52,7 +52,7 @@ func build() -> void:
 		rebuild())
 	_tabs.focus_mode = Control.FOCUS_NONE
 	content.add_child(_tabs)
-	_body = UiKit.vbox(12)
+	_body = UiKit.vbox(UiTheme.GAP)
 	content.add_child(_body)
 	_bars.clear()
 	match _tab:
@@ -73,7 +73,7 @@ func _build_quests() -> void:
 		if st != "active" and st != "done":
 			continue
 		shown += 1
-		var v := UiKit.vbox(6)
+		var v := UiKit.vbox(UiTheme.GAP_IN)
 		var t := UiKit.label(String(q.get("title", qid)), "Small")
 		t.add_theme_font_override("font", UiTheme.bold_font())
 		v.add_child(t)
@@ -84,7 +84,7 @@ func _build_quests() -> void:
 		v.add_child(bar)
 		v.add_child(pl)
 		_bars.append([bar, pl, o])
-		var row := UiKit.hbox(10)
+		var row := UiKit.hbox(UiTheme.GAP_ROW)
 		var rl := UiKit.label("Reward: " + UiText.reward(s, q.get("reward", {})), "Caption")
 		rl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		rl.add_theme_color_override("font_color", UiTheme.MONEY)
@@ -123,7 +123,7 @@ func _build_contract() -> void:
 		_body.add_child(UiKit.wrap("No contract right now. The next offer arrives in %s." % Num.duration(maxf(nxt, 0.0)), "Small"))
 		return
 	var it := s.content.item(String(c["item"]))
-	var v := UiKit.vbox(8)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
 	v.add_child(UiKit.label("Deliver %s" % String(it.get("name", c["item"])), "Heading"))
 	var bar := UiKit.progress(float(c.get("progress", 0.0)), float(c.get("target", 1.0)), "GreenBar", 20)
 	v.add_child(bar)
@@ -143,7 +143,7 @@ func _build_achievements() -> void:
 	for a in s.content.achievements:
 		var aid := String(a["id"])
 		var have := s.state.achievements.has(aid)
-		var h := UiKit.hbox(10)
+		var h := UiKit.hbox(UiTheme.GAP_ROW)
 		h.add_child(Icon.make("trophy" if have else "lock", 44, UiTheme.DIM, UiTheme.GOLD if have else UiTheme.DIM))
 		var v := UiKit.vbox(2)
 		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -279,6 +279,131 @@ func test_manual_repair() -> void:
 	assert_err(sim.execute({"type": "manual_repair", "facility": "warehouse"}), "not_repairable")
 
 
+## A plant with a workshop: crusher, washer and generator built, techs given.
+func _plant_sim() -> Simulation:
+	var sim := make_sim()
+	sim.state.money = 1e9
+	for t in ["crushing", "washing", "diesel_power", "counterweights", "workshop_tools"]:
+		sim.state.techs[t] = true
+	sim.invalidate_modifiers()
+	for f in ["crusher", "washer", "generator", "workshop"]:
+		assert_ok(sim.execute({"type": "build", "facility": f}))
+	return sim
+
+
+func test_mechanics_walk_their_round_and_keep_machines_in_shape() -> void:
+	var sim := _plant_sim()
+	assert_ok(sim.execute({"type": "hire", "role": "mechanic", "post": "workshop"}))
+	# Light wear everywhere: above the service mark, so no rush - the round
+	# alone must find and top up every machine.
+	for f in ["headframe", "crusher", "washer", "generator"]:
+		sim.state.facilities[f]["condition"] = 0.985
+	var stops := {}
+	var moves := 0
+	var last := ""
+	for i in 3000:
+		sim.tick(0.1)
+		var w: Dictionary = sim.state.workers[0]
+		if String(w["location"]) != last:
+			last = String(w["location"])
+			moves += 1
+		if String(w["job"]) == "service" or String(w["job"]) == "repair":
+			stops[String(w["target"])] = true
+	assert_true(stops.has("workshop") and stops.has("headframe") and stops.has("crusher") and stops.has("washer") and stops.has("generator"),
+		"the round visits the workshop and every machine: %s" % str(stops.keys()))
+	assert_gt(float(moves), 6.0, "the mechanic keeps moving between stops (%d moves)" % moves)
+	for f in ["headframe", "crusher", "washer", "generator"]:
+		assert_gt(float(sim.state.facilities[f]["condition"]), 0.995, "%s topped up to full condition" % f)
+	assert_true(String(UiText.worker_status(sim, sim.state.workers[0])) != "", "status text")
+
+
+func test_mechanic_rushes_to_a_worn_machine() -> void:
+	var sim := _plant_sim()
+	assert_ok(sim.execute({"type": "hire", "role": "mechanic", "post": "workshop"}))
+	sim.advance(30.0, 0.1)
+	sim.state.facilities["washer"]["condition"] = 0.6
+	sim.advance(1.5, 0.1)
+	var w: Dictionary = sim.state.workers[0]
+	assert_eq(String(w["job"]), "repair", "drops the round for the worn machine")
+	assert_eq(String(w["target"]), "washer")
+	assert_eq(String(w["location"]), "facility:washer:repair")
+	sim.advance(60.0, 0.1)
+	assert_gt(float(sim.state.facilities["washer"]["condition"]), 0.99, "repaired to full condition")
+	assert_false(bool(sim.state.facilities["washer"].get("repairing", false)), "no longer flagged worn")
+	assert_ge(float(sim.state.run_stats.get("repairs", 0.0)), 2.0, "restoring 40% counts as two repairs")
+
+
+func test_two_mechanics_split_the_work() -> void:
+	var sim := _plant_sim()
+	assert_ok(sim.execute({"type": "upgrade", "facility": "workshop", "count": 10}))
+	assert_ok(sim.execute({"type": "hire", "role": "mechanic", "post": "workshop"}))
+	assert_ok(sim.execute({"type": "hire", "role": "mechanic", "post": "workshop"}))
+	sim.state.facilities["crusher"]["condition"] = 0.5
+	sim.state.facilities["washer"]["condition"] = 0.55
+	sim.advance(1.5, 0.1)
+	var targets := {}
+	for w in sim.state.workers:
+		targets[String(w["target"])] = String(w["job"])
+	assert_eq(targets.get("crusher", ""), "repair", "one mechanic on the crusher")
+	assert_eq(targets.get("washer", ""), "repair", "the other on the washer")
+
+
+func test_power_grid_and_generator_add_up() -> void:
+	var sim := _plant_sim()
+	sim.state.facilities["generator"]["built"] = false
+	sim.tick(0.1)
+	var grid := float(content().bal("power", "grid_kw", 0.0))
+	assert_near(float(sim.rt["power"]["supply"]), grid, 1e-6, "the grid alone")
+	sim.state.facilities["generator"]["built"] = true
+	sim.tick(0.1)
+	var gen := content().facility_stat("generator", "power_kw", 1)
+	assert_near(float(sim.rt["power"]["supply"]), grid + gen, 1e-3, "the generator adds to the grid, never replaces it")
+	assert_near(float(sim.rt["power"]["grid"]), grid, 1e-6, "the grid's share is still there")
+	assert_ok(sim.execute({"type": "upgrade", "facility": "generator", "count": 4}))
+	sim.tick(0.1)
+	assert_near(float(sim.rt["power"]["supply"]), grid + content().facility_stat("generator", "power_kw", 5), 1e-3, "upgrades add on top")
+
+
+func test_power_feeds_the_line_in_order() -> void:
+	## A shortage slows only the machines the supply does not reach - never
+	## the belt, never the machines already running before a new one.
+	var sim := make_sim()
+	sim.state.money = 1e12
+	sim.state.research_points = 1e6
+	for t in ["crushing", "washing", "diesel_power", "smelting", "counterweights", "workshop_tools"]:
+		sim.state.techs[t] = true
+	sim.invalidate_modifiers()
+	assert_ok(sim.execute({"type": "upgrade", "facility": "conveyor", "count": 20}))
+	for f in ["crusher", "washer"]:
+		assert_ok(sim.execute({"type": "build", "facility": f}))
+		assert_ok(sim.execute({"type": "upgrade", "facility": f, "count": 30}))
+	sim.state.surface_bin = {"copper": 1e7}
+	sim.advance(3.0, 0.1)
+	var belt := ProcessingSystem.conveyor_rate(sim)
+	var crusher := ProcessingSystem.machine_capacity(sim, "crusher")
+	var washer := ProcessingSystem.machine_capacity(sim, "washer")
+	assert_near(UtilitySystem.power_factor(sim, "washer"), 1.0, 1e-6, "the grid runs a crusher and a washer")
+	assert_ok(sim.execute({"type": "build", "facility": "workshop"}))
+	assert_ok(sim.execute({"type": "build", "facility": "smelter"}))
+	sim.drain_events()
+	sim.advance(3.0, 0.1)
+	assert_near(ProcessingSystem.conveyor_rate(sim), belt, 1e-6, "the belt keeps its speed")
+	assert_near(ProcessingSystem.machine_capacity(sim, "crusher"), crusher, crusher * 0.01, "the crusher keeps its power")
+	assert_near(ProcessingSystem.machine_capacity(sim, "washer"), washer, washer * 0.01, "the washer keeps its power")
+	assert_lt(UtilitySystem.power_factor(sim, "smelter"), 0.5, "the new smelter is short")
+	var sm: Dictionary = sim.state.facilities["smelter"]
+	assert_lt(float(sm["util"]), float(sm["need"]), "a machine short of power does less than it is asked (and wears only for that)")
+	assert_eq(String(sim.rt["power"]["short"]), "smelter", "the shortage is reported at the smelter")
+	var warned := false
+	for e in sim.drain_events():
+		warned = warned or (e["type"] == "power_short" and e["facility"] == "smelter")
+	assert_true(warned, "the player is told the smelter is short of power")
+	assert_ok(sim.execute({"type": "build", "facility": "generator"}))
+	sim.advance(3.0, 0.1)
+	assert_near(UtilitySystem.power_factor(sim, "smelter"), 1.0, 1e-6, "the generator powers the smelter")
+	assert_false(float(sim.rt["power"]["draw"].get("workshop", 0.0)) > 0.0, "the workshop draws no power")
+
+
 func test_node_depletion_respawn_and_discovery() -> void:
 	var sim := make_sim(77)
 	sim.state.money = 1e12

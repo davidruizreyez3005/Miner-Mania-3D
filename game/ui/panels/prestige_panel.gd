@@ -39,7 +39,7 @@ func build() -> void:
 	var s := sim()
 	_legacy.clear()
 	content.add_child(UiKit.wrap("Sell this claim to a mining company for Legacy Points. You start a new claim with nothing but your legacy: every Legacy Point ever earned raises all income for good, and points buy lasting upgrades. Achievements, the codex and outfits stay with you."))
-	var v := UiKit.vbox(8)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
 	_gain_label = UiKit.label("", "Big")
 	v.add_child(_gain_label)
 	_mult_label = UiKit.label("", "Small")

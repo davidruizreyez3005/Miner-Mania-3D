@@ -7,8 +7,10 @@ extends Agent
 ## matching clip, tool and props. It only ever reads the simulation.
 ##
 ## Activities: mine, haul (face <-> station loop with a sack), operate,
-## repair, research, survey (geologist wandering between veins), supervise,
-## rest (bench or ground) and idle.
+## repair and service (mechanics: wrench and hammer while the machine needs
+## work, a look-over once it is in shape, the bench at the workshop),
+## research, survey (geologist wandering between veins), supervise, rest
+## (bench or ground) and idle.
 
 const HAUL_PROPS := ["prop_ore_sack_01", "prop_crate_carry_01"]
 const CREW_LOD := 2                  # ~5k-triangle crew models (the foreman keeps the full one)
@@ -113,9 +115,8 @@ func _start_activity() -> void:
 			_haul_begin()
 		"operate":
 			rig.play("Operate", _variety, 0.35)
-		"repair":
-			rig.set_hand_tool("tool_wrench_01")
-			rig.play("Repair", _variety, 0.35)
+		"repair", "service":
+			_service_tick(0.0, true)
 		"research":
 			rig.play("Inspect", _variety, 0.35)
 		"survey", "supervise", "manage":
@@ -143,16 +144,8 @@ func tick(delta: float) -> void:
 				if _hold <= 0.0:
 					_hold = 0.75
 					mgr.on_impact(self, spot.get("look", position + Vector3(0, 0.8, -1.0)))
-		"repair":
-			# Alternate the wrench with the hammer now and then.
-			var cyc := fmod(_t, 14.0)
-			if cyc < 10.0:
-				if rig.clip != "Repair":
-					rig.set_hand_tool("tool_wrench_01")
-					rig.play("Repair", _variety, 0.3)
-			elif rig.clip != "Hammer":
-				rig.set_hand_tool("tool_hammer_01")
-				rig.play("Hammer", _variety, 0.3)
+		"repair", "service":
+			_service_tick(delta)
 		"survey", "supervise", "manage":
 			_hold -= delta
 			if _phase == "look" and _hold <= 0.0:
@@ -167,6 +160,30 @@ func tick(delta: float) -> void:
 				rig.play("Idle", _variety, 0.3)
 		"haul":
 			_haul_tick(delta)
+
+
+# ---------------------------------------------------------------- servicing
+
+## Mechanics at a stop: the wrench (now and then the hammer) while the
+## machine needs work or at the workshop bench; a look-over once it is in
+## full condition.
+func _service_tick(_delta: float, start: bool = false) -> void:
+	var target := String(record.get("target", ""))
+	var fs: Dictionary = mgr.sim.state.facilities.get(target, {})
+	var working := target == "workshop" or float(fs.get("condition", 1.0)) < 0.999
+	var want := "Inspect"
+	if working:
+		want = "Repair" if fmod(_t, 14.0) < 10.0 else "Hammer"
+	if want == rig.clip and not start:
+		return
+	match want:
+		"Repair":
+			rig.set_hand_tool("tool_wrench_01")
+		"Hammer":
+			rig.set_hand_tool("tool_hammer_01")
+		_:
+			rig.set_hand_tool("tool_wrench_01")
+	rig.play(want, _variety, 0.3)
 
 
 # ------------------------------------------------------------------ hauling

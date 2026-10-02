@@ -32,13 +32,13 @@ func build() -> void:
 	_hint = UiKit.wrap("", "Small")
 	_hint.add_theme_color_override("font_color", UiTheme.GOLD)
 	content.add_child(UiKit.card(_hint, "CardHi"))
-	_rows = UiKit.vbox(10)
+	_rows = UiKit.vbox(UiTheme.GAP)
 	content.add_child(_rows)
 
 
 func _stage(icon: String, name: String, rate: float, cap: float, note: String = "") -> void:
-	var v := UiKit.vbox(4)
-	var h := UiKit.hbox(10)
+	var v := UiKit.vbox(UiTheme.GAP_IN)
+	var h := UiKit.hbox(UiTheme.GAP_ROW)
 	h.add_child(Icon.make(icon, 40, UiTheme.TEXT, UiTheme.GOLD))
 	var n := UiKit.label(name, "Small")
 	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -87,14 +87,38 @@ func refresh() -> void:
 	_stage("truck", "Trucks", float(ts.get("sold_rate", 0.0)), float(ts.get("rate", 0.0)), "Earning %s/s" % Num.money(float(ts.get("earn_rate", 0.0))))
 	var pw: Dictionary = s.rt.get("power", {})
 	if float(pw.get("demand", 0.0)) > 0.0:
-		_rows.add_child(UiKit.kv("Power", "%s / %s kW  (%d%%)" % [Num.short(float(pw.get("supply", 0.0))), Num.short(float(pw.get("demand", 0.0))),
-			roundi(float(s.rt.get("power_factor", 1.0)) * 100.0)]))
+		_power_card(s, pw)
 	_hint.text = _bottleneck(s, mined, ls, pl, ts)
+
+
+## Supply (the grid plus the generator) against what the plant asks for.
+func _power_card(s: Simulation, pw: Dictionary) -> void:
+	var supply := float(pw.get("supply", 0.0))
+	var demand := float(pw.get("demand", 0.0))
+	var v := UiKit.vbox(UiTheme.GAP_IN)
+	var h := UiKit.hbox(UiTheme.GAP_ROW)
+	h.add_child(Icon.make("bolt", 40, UiTheme.TEXT, UiTheme.GOLD))
+	var n := UiKit.label("Power", "Small")
+	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(n)
+	h.add_child(UiKit.label("%s / %s kW" % [Num.short(demand), Num.short(supply)], "Caption"))
+	v.add_child(h)
+	v.add_child(UiKit.progress(minf(demand, supply), maxf(supply, 1e-9), "TealBar", 12))
+	var src := "Grid %s kW" % Num.short(float(pw.get("grid", 0.0)))
+	if s.facility_built("generator"):
+		src += " + generator %s kW" % Num.short(float(pw.get("generator", 0.0)))
+	v.add_child(UiKit.label(src, "Caption"))
+	_rows.add_child(UiKit.card(v))
 
 
 func _bottleneck(s: Simulation, mined: float, ls: Dictionary, pl: Dictionary, ts: Dictionary) -> String:
 	if s.state.workers.is_empty():
 		return "Tip: hire miners so the mine works while you do other things."
+	var pw: Dictionary = s.rt.get("power", {})
+	var short := String(pw.get("short", ""))
+	if short != "" and UtilitySystem.power_factor(s, short) < 0.95:
+		return "Power is short: the %s runs at %d%% (machines further up the line get power first). %s." % [
+			String(s.content.facility(short).get("name", short)), roundi(UtilitySystem.power_factor(s, short) * 100.0), UiText.power_fix(s)]
 	for dep in s.state.depths:
 		if dep["unlocked"] and Simulation.inv_total(dep["station"]) >= Economy.station_capacity(s, int(dep["index"])) - 0.01:
 			return "Bottleneck: the %s station is full - the lift can't keep up. Upgrade the Headframe or hire a lift operator." % String(s.content.depth(int(dep["index"])).get("name", ""))

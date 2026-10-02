@@ -38,8 +38,8 @@ func build() -> void:
 	section("Hire")
 	for r in s.content.roles:
 		var role := String(r["id"])
-		var v := UiKit.vbox(6)
-		var h := UiKit.hbox(10)
+		var v := UiKit.vbox(UiTheme.GAP_IN)
+		var h := UiKit.hbox(UiTheme.GAP_ROW)
 		h.add_child(Icon.make(String(UiText.ROLE_ICONS.get(role, "worker")), 44, UiTheme.TEXT, UiTheme.GOLD))
 		var nv := UiKit.vbox(0)
 		nv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -58,7 +58,7 @@ func build() -> void:
 			v.add_child(UiKit.label("No place to post one yet.", "Caption"))
 			content.add_child(UiKit.card(v))
 			continue
-		var row := UiKit.hbox(10)
+		var row := UiKit.hbox(UiTheme.GAP_ROW)
 		var ob := OptionButton.new()
 		ob.custom_minimum_size = Vector2(0, 84)
 		ob.size_flags_horizontal = Control.SIZE_EXPAND_FILL

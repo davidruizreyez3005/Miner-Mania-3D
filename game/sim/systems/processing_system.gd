@@ -7,7 +7,8 @@ extends RefCounted
 ## spare capacity; the share a machine cannot take bypasses it and leaves as
 ## the product reached so far. Machines therefore never block the belt - they
 ## decide how much of the flow is refined and so how much it is worth.
-## Machines run slower without an operator, when worn, or when power is short.
+## Machines run slower without an operator, when worn, or when the power
+## does not reach them (UtilitySystem feeds the belt first, then the line).
 
 
 static func reachable_steps(sim: Simulation, res_id: String) -> Array:
@@ -33,19 +34,21 @@ static func operator_factor(sim: Simulation, fid: String) -> float:
 	return float(fac.get("unoperated_speed", 0.35))
 
 
-static func machine_capacity(sim: Simulation, fid: String) -> float:
+## Units/s the machine can process now. `with_power` false gives its
+## full-power capacity (what it would do with all the power it asks for).
+static func machine_capacity(sim: Simulation, fid: String, with_power: bool = true) -> float:
 	var fs: Dictionary = sim.state.facilities.get(fid, {})
 	if not fs.get("built", false):
 		return 0.0
 	var sup := sim.crew("plant", "supervisor") * float(sim.content.role_by_id.get("supervisor", {}).get("stats", {}).get("area_bonus", 0.15))
 	return sim.content.facility_stat(fid, "throughput", int(fs["level"])) * sim.mods.m("processing_rate") \
-		* Economy.condition_factor(sim, float(fs["condition"])) * float(sim.rt.get("power_factor", 1.0)) \
+		* Economy.condition_factor(sim, float(fs["condition"])) * (UtilitySystem.power_factor(sim, fid) if with_power else 1.0) \
 		* operator_factor(sim, fid) * (1.0 + sup) * sim.boost_mult()
 
 
 static func conveyor_rate(sim: Simulation) -> float:
 	return sim.content.facility_stat("conveyor", "throughput", sim.facility_level("conveyor")) * sim.mods.m("conveyor_rate") \
-		* float(sim.rt.get("power_factor", 1.0)) * sim.boost_mult()
+		* UtilitySystem.power_factor(sim, "conveyor") * sim.boost_mult()
 
 
 static func machine_has_work(sim: Simulation, fid: String) -> bool:
@@ -64,6 +67,7 @@ static func tick(sim: Simulation, dt: float) -> void:
 	for fid in machines:
 		if s.facilities.has(fid):
 			s.facilities[fid]["util"] = 0.0
+			s.facilities[fid]["need"] = 0.0
 	var plant := {"rate": 0.0, "capacity": conveyor_rate(sim), "bottleneck": "", "util": {}, "processed_share": 1.0, "short": ""}
 	var total := Simulation.inv_total(s.surface_bin)
 	if total <= 1e-9:
@@ -102,7 +106,12 @@ static func tick(sim: Simulation, dt: float) -> void:
 		if frac < worst:
 			worst = frac
 			plant["short"] = fid
-		s.facilities[fid]["util"] = clampf(demand / maxf(cap, 1e-9), 0.0, 1.0)
+		# Shares of the full-power capacity: "need" is the work waiting (what
+		# the machine asks the power system for - a shortage never inflates
+		# its own demand), "util" the work done (wear, load, animation).
+		var full := maxf(machine_capacity(sim, fid, false) * dt, 1e-9)
+		s.facilities[fid]["need"] = clampf(demand / full, 0.0, 1.0)
+		s.facilities[fid]["util"] = clampf(minf(demand, cap) / full, 0.0, 1.0)
 		plant["util"][fid] = s.facilities[fid]["util"]
 		for rid in waiting:
 			var amt := float(flows[rid][0])

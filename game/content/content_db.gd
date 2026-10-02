@@ -734,6 +734,16 @@ func _validate_balance(e: Array) -> void:
 		e.append("balance offline caps invalid")
 	if not region_by_id.has(String(bal("start", "region", ""))):
 		e.append("balance start.region unknown")
+	if float(bal("power", "grid_kw", -1.0)) < 0.0:
+		e.append("balance power.grid_kw must be >= 0")
+	for fid in bal("power", "priority", []):
+		if not facility_by_id.has(String(fid)):
+			e.append("balance power.priority names an unknown facility '%s'" % fid)
+	var service_at := float(bal("condition", "service_at", 0.97))
+	if service_at < float(bal("condition", "repair_threshold", 0.8)) or service_at > float(bal("condition", "repaired_at", 0.999)):
+		e.append("balance condition.service_at must lie between repair_threshold and repaired_at")
+	if float(bal("condition", "service_s", 6.0)) < 0.0:
+		e.append("balance condition.service_s must be >= 0")
 	var tut_objectives := []
 	for step in tutorial:
 		if String(step.get("complete_on", "")) == "":
