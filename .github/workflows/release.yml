@@ -1,18 +1,20 @@
 name: Release
 
 # Builds a release-signed APK for a version tag (v1.2.3) or on demand and
-# attaches it to a GitHub release. Signing material comes only from GitHub
-# Secrets and is never written to the repository or printed:
+# attaches it to a GitHub release. It is signed with the update key the
+# Android workflow signs every build with (tools/ci/update_key.sh), which
+# comes only from GitHub Secrets and is never written to the repository or
+# printed:
 #
-#   ANDROID_KEYSTORE_BASE64   base64 of the release keystore (.jks/.keystore)
-#   ANDROID_KEYSTORE_PASSWORD keystore password
-#   ANDROID_KEY_ALIAS         key alias
+#   ANDROID_UPDATE_SEED       a random password the key is derived from, or
+#   ANDROID_KEYSTORE_BASE64   a keystore of your own (base64)
+#   ANDROID_KEYSTORE_PASSWORD   its password
+#   ANDROID_KEY_ALIAS           its key alias
 #
 # The keystore lives in the runner's temp directory for the export only; the
 # password reaches Godot through its GODOT_ANDROID_KEYSTORE_RELEASE_*
 # environment variables, and the APK is scanned to prove none of it leaked.
-# It is the same update key the Android workflow signs every build with, and
-# the version code comes from the commit, so a release installs over any
+# The version code comes from the commit, so a release installs over any
 # earlier build and keeps its save (docs/android_signing.md).
 
 on:
@@ -52,20 +54,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Check the signing secrets are configured
+      - name: Signing key (the update key from the repository secrets)
         env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KA: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_UPDATE_SEED: ${{ secrets.ANDROID_UPDATE_SEED }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          missing=()
-          [[ -n "$KS" ]] || missing+=(ANDROID_KEYSTORE_BASE64)
-          [[ -n "$KP" ]] || missing+=(ANDROID_KEYSTORE_PASSWORD)
-          [[ -n "$KA" ]] || missing+=(ANDROID_KEY_ALIAS)
-          if (( ${#missing[@]} )); then
-            echo "::error title=Release signing not configured::Add these repository secrets: ${missing[*]}"
-            exit 1
-          fi
+          python tools/apk/update_key.py --self-test
+          rc=0
+          tools/ci/update_key.sh "$RUNNER_TEMP/release.p12" || rc=$?
+          [[ $rc -ne 3 ]] || echo "::error title=Release signing not configured::Add the repository secret ANDROID_UPDATE_SEED (docs/android_signing.md)"
+          [[ $rc -eq 0 ]] || exit 1
 
       - name: Prepare the game project
         uses: ./.github/actions/prepare-game
@@ -95,34 +95,41 @@ jobs:
 
       - name: Export the signed release APK
         env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KA: ${{ secrets.ANDROID_KEY_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.UPDATE_KEYSTORE }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ env.UPDATE_KEY_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ env.UPDATE_KEY_PASSWORD }}
         run: |
-          echo "::add-mask::$KP"
           java_home="${JAVA_HOME_17_X64:-$JAVA_HOME}"
           python tools/ci/configure_godot_android.py --sdk "$ANDROID_SDK" --java "$java_home"
-          keystore="$RUNNER_TEMP/release.keystore"
-          printf '%s' "$KS" | base64 --decode > "$keystore"
-          chmod 600 "$keystore"
           mkdir -p build/apk
-          GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$keystore" \
-          GODOT_ANDROID_KEYSTORE_RELEASE_USER="$KA" \
-          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$KP" \
-            "$GODOT" --headless --path . --export-release "Android" "build/apk/MinerMania3D-$APP_VERSION.apk" > build/apk/export.log 2>&1 \
-            || { rm -f "$keystore"; cat build/apk/export.log; exit 1; }
-          rm -f "$keystore"
+          "$GODOT" --headless --path . --export-release "Android" "build/apk/MinerMania3D-$APP_VERSION.apk" > build/apk/export.log 2>&1 \
+            || { rm -f "$UPDATE_KEYSTORE"; cat build/apk/export.log; exit 1; }
+          rm -f "$UPDATE_KEYSTORE"
           test -s "build/apk/MinerMania3D-$APP_VERSION.apk"
 
-      - name: Verify the release APK (including a leak scan for the signing secrets)
+      - name: Verify the release APK (update key, version, leak scan for the signing secrets)
         env:
           SECRET_VALUES: |
+            ${{ secrets.ANDROID_UPDATE_SEED }}
             ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
             ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+            ${{ env.UPDATE_KEY_PASSWORD }}
         run: |
           python tools/apk/verify_apk.py "build/apk/MinerMania3D-$APP_VERSION.apk" --sdk "$ANDROID_SDK" --expect-release \
             --expect-version-code "$APK_VERSION_CODE" --expect-version-name "$APK_VERSION_NAME" \
+            --expect-cert-sha256 "$SIGNING_CERT_SHA256" \
             --report build/apk/apk_report.json --manifest build/apk/apk_manifest.json
+          python - <<'PY'
+          import os, pathlib, sys
+          values = [v.strip() for v in os.environ.get("SECRET_VALUES", "").splitlines() if len(v.strip()) >= 4]
+          log = pathlib.Path("build/apk/export.log")
+          if log.exists() and any(v in log.read_text(errors="replace") for v in values):
+              log.unlink()
+              print("::error title=Signing secret in the export log::removed it")
+              sys.exit(1)
+          print(f"export log checked for {len(values)} secret values: clean")
+          PY
+          echo "UPDATE_KEY_PASSWORD=" >> "$GITHUB_ENV"
 
       - name: Publish the GitHub release
         env:

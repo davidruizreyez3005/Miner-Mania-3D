@@ -18,14 +18,15 @@ name: Android
 # Updates keep the player's save: Android installs an APK over the
 # installed game (keeping its data) only when it is signed with the same key
 # and its version code does not go down. Every build is therefore signed with
-# the update key from the repository secrets (ANDROID_KEYSTORE_BASE64,
-# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS - the release key; see
-# docs/android_signing.md) and its version code comes from the commit time
-# (tools/apk/set_version.py). Without the secrets a one-off key is used and
-# the run says loudly that the APK cannot update an earlier install. The
-# device test installs the APK over the running game and, when the previous
-# successful build of the branch carries the same key, updates that build
-# with a saved claim to this one: the claim must still be there.
+# the update key (tools/ci/update_key.sh: derived from the repository secret
+# ANDROID_UPDATE_SEED, or a keystore of your own in ANDROID_KEYSTORE_BASE64 /
+# ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS; the release workflow uses
+# the same key - docs/android_signing.md) and its version code comes from the
+# commit time (tools/apk/set_version.py). Without a key secret a one-off key
+# is used and the run says loudly that the APK cannot update an earlier
+# install. The device test installs the APK over the running game and, when
+# the previous successful build of the branch carries the same key, updates
+# that build with a saved claim to this one: the claim must still be there.
 
 on:
   push:
@@ -81,30 +82,25 @@ jobs:
 
       - name: Signing key (the update key from the repository secrets, else a one-off key)
         env:
-          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KA: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_UPDATE_SEED: ${{ secrets.ANDROID_UPDATE_SEED }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           java_home="${JAVA_HOME_17_X64:-$JAVA_HOME}"
           test -x "$java_home/bin/java"
-          if [[ -n "$KS" && -n "$KP" && -n "$KA" ]]; then
-            echo "::add-mask::$KP"
-            keystore="$RUNNER_TEMP/update.keystore"
-            printf '%s' "$KS" | base64 --decode > "$keystore"
-            chmod 600 "$keystore"
-            # The certificate fingerprint is public: it is what every build must carry.
-            cert=$("$java_home/bin/keytool" -list -v -keystore "$keystore" -storepass:env KP -alias "$KA" \
-              | sed -n 's/^[[:space:]]*SHA256: //p' | head -1 | tr -d ': ' | tr 'A-F' 'a-f')
-            [[ ${#cert} -eq 64 ]] || { echo "::error title=Update key unreadable::Check ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS"; exit 1; }
+          python tools/apk/update_key.py --self-test
+          if tools/ci/update_key.sh "$RUNNER_TEMP/update.p12"; then
             python tools/ci/configure_godot_android.py --sdk "$ANDROID_SDK" --java "$java_home"
-            { echo "SIGNING=update"; echo "UPDATE_KEYSTORE=$keystore"; echo "SIGNING_CERT_SHA256=$cert"; } >> "$GITHUB_ENV"
           else
+            rc=$?
+            [[ $rc -eq 3 ]] || exit $rc
             keystore="$RUNNER_TEMP/debug.keystore"
             "$java_home/bin/keytool" -genkeypair -keystore "$keystore" -storepass android -alias androiddebugkey \
               -keypass android -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Android Debug,O=Android,C=US" -noprompt
             python tools/ci/configure_godot_android.py --sdk "$ANDROID_SDK" --java "$java_home" --debug-keystore "$keystore"
             echo "SIGNING=one-off" >> "$GITHUB_ENV"
-            echo "::warning title=This APK cannot update an earlier install::It is signed with a one-off key. Add the repository secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS (docs/android_signing.md): every build is then signed with the same key and installs over the previous one, keeping the save."
+            echo "::warning title=This APK cannot update an earlier install::It is signed with a one-off key. Add the repository secret ANDROID_UPDATE_SEED - a random password of 20 or more characters (docs/android_signing.md): every build is then signed with the same key and installs over the previous one, keeping the save."
           fi
 
       - name: Export the debug APK and its x86_64 twin for the emulator
@@ -113,8 +109,8 @@ jobs:
           # editor's debug keystore configured above). Not verbose: Godot only
           # redacts signing credentials from verbose logs of release exports.
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ env.UPDATE_KEYSTORE }}
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: ${{ secrets.ANDROID_KEY_ALIAS }}
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: ${{ env.UPDATE_KEY_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: ${{ env.UPDATE_KEY_PASSWORD }}
         run: |
           mkdir -p build/apk
           "$GODOT" --headless --path . --export-debug "Android" build/apk/MinerMania3D-debug.apk 2>&1 | tee build/apk/export.log
@@ -129,8 +125,10 @@ jobs:
       - name: Verify the APK (version, update key, no secrets inside or in the logs)
         env:
           SECRET_VALUES: |
+            ${{ secrets.ANDROID_UPDATE_SEED }}
             ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
             ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+            ${{ env.UPDATE_KEY_PASSWORD }}
         run: |
           python tools/apk/verify_apk.py build/apk/MinerMania3D-debug.apk --sdk "$ANDROID_SDK" \
             --expect-version-code "$APK_VERSION_CODE" --expect-version-name "$APK_VERSION_NAME" \
@@ -149,6 +147,7 @@ jobs:
               sys.exit(1)
           print(f"export logs checked for {len(values)} secret values: clean")
           PY
+          echo "UPDATE_KEY_PASSWORD=" >> "$GITHUB_ENV"     # the keystore is gone; so is its password
 
       - name: Summary
         if: always()
@@ -165,10 +164,11 @@ jobs:
           print(f"- min SDK {r.get('min_sdk','?')}, target SDK {r.get('target_sdk','?')}, signed by `{r.get('signer','?')}`")
           cert = r.get("cert_sha256", "")
           if os.environ.get("SIGNING") == "update":
-              print(f"- signed with the **update key** (certificate SHA-256 `{cert}`): installs over earlier builds with this key, keeping the save")
+              src = "ANDROID_UPDATE_SEED" if os.environ.get("SIGNING_SOURCE") == "seed" else "the keystore secrets"
+              print(f"- signed with the **update key** from {src} (certificate SHA-256 `{cert}`): installs over earlier builds with this key, keeping the save")
           else:
               print(f"- **signed with a one-off key** (`{cert[:16]}...`): this APK cannot be installed over an earlier build - uninstalling first deletes the save. "
-                    "Add the update key secrets (docs/android_signing.md).")
+                    "Add the repository secret ANDROID_UPDATE_SEED (docs/android_signing.md).")
           print(f"- verification: {'PASSED' if r.get('passed') else 'FAILED'}")
           print(f"- size by kind (MB): {r.get('size_by_kind_mb', {})}")
           PY

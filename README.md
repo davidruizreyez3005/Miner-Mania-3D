@@ -98,9 +98,10 @@ arrows and +/- move the camera).
   renderer at 720x1600, and a balance report (pull requests; also the first
   stage of Android).
 - **Android** - on every push: validate, export a debug APK stamped with a
-  version code from the commit time and signed with the update key from
-  repository secrets (so it installs over the previous build and keeps the
-  save - see [docs/android_signing.md](docs/android_signing.md)), verify it
+  version code from the commit time and signed with the update key derived
+  from one repository secret, `ANDROID_UPDATE_SEED` (so it installs over the
+  previous build and keeps the save - see
+  [docs/android_signing.md](docs/android_signing.md)), verify it
   and upload it with its reports; then play it on an Android 15 emulator
   with touch input - title screen, new claim, tutorial, camera, pause menu,
   Back key, autosaves, background and resume, an update installed over the
@@ -113,10 +114,10 @@ arrows and +/- move the camera).
   the emulator) on Vulkan. Phones run Vulkan with Android frame pacing
   (Swappy), which the emulator's virtual GPU cannot present with, so the
   twin turns it off (an x86_64-only project setting override).
-- **Release** - on a `v*` tag: a release-signed APK from repository
-  secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
-  `ANDROID_KEY_ALIAS` - the same update key), verified and attached to a
-  GitHub release.
+- **Release** - on a `v*` tag: an APK signed with the same update key
+  (`ANDROID_UPDATE_SEED`, or a keystore of your own in
+  `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` /
+  `ANDROID_KEY_ALIAS`), verified and attached to a GitHub release.
 
 No keys, passwords or tokens live in this repository; signing material comes
 only from GitHub Secrets and the APK is scanned for leaks before publishing.
@@ -125,4 +126,4 @@ only from GitHub Secrets and the APK is scanned for leaks before publishing.
 
 - [docs/game_architecture.md](docs/game_architecture.md) - how the game is put together
 - [docs/asset_pipeline.md](docs/asset_pipeline.md) - the procedural asset pipeline
-- [docs/android_signing.md](docs/android_signing.md) - updates that keep the save: setting up the signing key
+- [docs/android_signing.md](docs/android_signing.md) - updates that keep the save: the one secret to add

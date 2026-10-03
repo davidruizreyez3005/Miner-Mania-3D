@@ -29,8 +29,8 @@ static func compute_stage(sim: Simulation) -> int:
 			break
 	if not miners:
 		return 0
-	var lift_auto := TransportSystem.lift_automatic(sim) or not sim.workers_at("headframe", "operator").is_empty()
-	var sales_auto := sim.mods.has_flag("auto_sales") or not sim.workers_at("office", "supervisor").is_empty()
+	var lift_auto := TransportSystem.lift_automatic(sim)
+	var sales_auto := SalesSystem.automatic(sim)
 	var plant_auto := true
 	for fid in sim.content.processing_facilities():
 		if sim.facility_built(fid) and sim.workers_at(fid, "operator").is_empty() and not sim.mods.has_flag("machines_self_run"):

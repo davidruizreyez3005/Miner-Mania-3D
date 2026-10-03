@@ -74,6 +74,13 @@ maintenance, progression. Rules that matter:
   wears: `service_s` at each stop, leaving it in full condition) and drop it
   for any machine below `service_at`, claiming jobs so two never swap
   machines; every 20 % of condition they restore counts as a repair.
+- **Automation that stays on**: the lift runs by itself once an operator is
+  hired for it, and sales once a sales manager is (`Simulation.on_duty`
+  counts workers at their post, working or waiting for work). An operator
+  waiting for ore keeps the lift - and a machine operator the machine -
+  ready; on a break the winder runs at its relief pace (`lift.relief_pace`)
+  instead of stopping, so the LIFT and SELL buttons never come back while
+  someone is hired.
 - **Haulage never slows the mine**: miners fill the face buffer as fast as
   the posted haulers (and carts) can carry it to the station
   (`TransportSystem.haul_capacity`) and carry the rest themselves at 55 %
@@ -348,7 +355,12 @@ pacing.
 A new APK installs over the game - keeping the save - only with the same
 package id, a version code that is not lower and the same signing key.
 `tools/apk/set_version.py` stamps every build with a version code from its
-commit time (minutes since 2020), and CI signs with one update key from the
-repository secrets; `tools/apk/verify_apk.py` checks the version and the
+commit time (minutes since 2020), and CI signs with one update key
+(`tools/ci/update_key.sh`). It is derived from a single repository secret,
+`ANDROID_UPDATE_SEED`, by `tools/apk/update_key.py`: SHAKE-256 seeds a
+deterministic RSA-3072 prime search and the self-signed certificate is
+signed with PKCS#1 v1.5, so the same seed gives a byte-identical
+certificate on every run (a keystore of your own in three other secrets
+takes precedence). `tools/apk/verify_apk.py` checks the version and the
 signing certificate of every APK. Setup, and the one-time switch from builds
 signed with a one-off key: [android_signing.md](android_signing.md).

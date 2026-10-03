@@ -2,10 +2,12 @@ class_name TransportSystem
 extends RefCounted
 ## Moving ore: haulage inside each gallery (face pile -> shaft station, by
 ## haulers and rail carts) and the shaft lift (every station -> surface ore
-## silos). The lift needs an operator to run by itself; otherwise each
-## "Call lift" runs it for one full round trip. Throughput is capacity per
-## trip over the round-trip time to the deepest open level, so digging
-## deeper makes the lift slower until it is upgraded.
+## silos). The lift runs by itself once an operator is hired for it -
+## whether the operator is winding, waiting for ore or on a break (then the
+## winder runs at its slower relief pace); without one each "Call lift" runs
+## it for one full round trip. Throughput is capacity per trip over the
+## round-trip time to the deepest open level, so digging deeper makes the
+## lift slower until it is upgraded.
 
 
 static func haul_rate(sim: Simulation, d: int) -> float:
@@ -83,11 +85,20 @@ static func lift_stats(sim: Simulation) -> Dictionary:
 	var deepest := maxi(1, sim.state.deepest_unlocked())
 	var dist := absf(sim.layout.surface_y - sim.layout.floor_y(deepest))
 	var cycle := 2.0 * dist / speed + float(sim.content.bal("lift", "load_s", 2.0)) + float(sim.content.bal("lift", "unload_s", 2.0)) + 0.5 * float(deepest - 1)
-	return {"capacity": cap, "speed": speed, "cycle_s": cycle, "rate": cap / cycle, "deepest": deepest}
+	# The operator on a break (or still on the way): the winder keeps going at
+	# its relief pace instead of stopping and waiting for the player.
+	var relief := lift_automatic(sim) and sim.on_duty("headframe", "operator") <= 0.0
+	if relief:
+		cycle /= clampf(float(sim.content.bal("lift", "relief_pace", 0.5)), 0.05, 1.0)
+	return {"capacity": cap, "speed": speed, "cycle_s": cycle, "rate": cap / cycle, "deepest": deepest, "relief": relief}
 
 
+## The lift runs by itself while an operator is hired for it.
 static func lift_automatic(sim: Simulation) -> bool:
-	return sim.crew("headframe", "operator") > 0.0
+	for w in sim.state.workers:
+		if w["post"] == "headframe" and w["role"] == "operator":
+			return true
+	return false
 
 
 static func stations_total(sim: Simulation) -> float:
@@ -98,8 +109,11 @@ static func stations_total(sim: Simulation) -> float:
 	return t
 
 
+## Ore waits at a station, or arrives as fast as the lift takes it (the
+## stations are empty between steps then), and the silo has room.
 static func lift_has_work(sim: Simulation) -> bool:
-	return stations_total(sim) > 0.01 and Simulation.inv_total(sim.state.surface_bin) < Economy.bin_capacity(sim) - 0.01
+	var flowing := float(sim.rt.get("lift", {}).get("moved_rate", 0.0)) > 0.0
+	return (stations_total(sim) > 0.01 or flowing) and Simulation.inv_total(sim.state.surface_bin) < Economy.bin_capacity(sim) - 0.01
 
 
 static func tick_lift(sim: Simulation, dt: float) -> void:

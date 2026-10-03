@@ -16,8 +16,15 @@ static func truck_stats(sim: Simulation) -> Dictionary:
 	return {"trucks": int(trucks), "capacity": cap, "trip_s": trip, "rate": trucks * cap / trip}
 
 
+## Sales run by themselves with the dispatch research or a sales manager
+## hired at the office (also while the manager is on a break).
 static func automatic(sim: Simulation) -> bool:
-	return sim.mods.has_flag("auto_sales") or sim.crew("office", "supervisor") > 0.0
+	if sim.mods.has_flag("auto_sales"):
+		return true
+	for w in sim.state.workers:
+		if w["post"] == "office" and w["role"] == "supervisor":
+			return true
+	return false
 
 
 static func tick(sim: Simulation, dt: float) -> void:

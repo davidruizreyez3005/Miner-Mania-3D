@@ -173,6 +173,130 @@ func test_operator_automates_lift_and_manager_sales() -> void:
 	assert_eq(sim.automation_stage(), 2, "fully automated (no plant yet)")
 
 
+## The hired operator keeps the lift automatic whatever they are doing:
+## winding, waiting at the winder (empty stations, a full silo) or on a
+## break - then the winder runs at its relief pace. The LIFT button (shown
+## while the lift is not automatic) never comes back.
+func test_lift_stays_automatic_with_its_operator() -> void:
+	var sim := make_sim()
+	sim.state.money = 1e6
+	assert_ok(sim.execute({"type": "hire", "role": "operator", "post": "headframe"}))
+	var op: Dictionary = sim.workers_at("headframe", "operator")[0]
+	var dep := sim.state.depth(1)
+	var manual_ticks := 0
+	var seen := {}
+	var full_rate := 0.0
+	var duty_rate := 0.0
+	var relief_rate := 0.0
+	var relief_moved := 0.0
+	for i in 3000:
+		var phase := i / 600                        # 60 s each
+		match phase:
+			0, 1:                                    # walking over, then winding
+				dep["station"] = {"stone": 50.0}
+				sim.state.surface_bin = {}
+			2:                                       # nothing to lift: waiting at the winder
+				dep["station"] = {}
+			3:                                       # the silo is full: waiting again
+				dep["station"] = {"stone": 50.0}
+				sim.state.surface_bin = {"stone": Economy.bin_capacity(sim)}
+			4:                                       # worn out: a break
+				if i == 2400:
+					op["energy"] = 0.01
+				dep["station"] = {"stone": 50.0}
+				sim.state.surface_bin = {}
+		sim.tick(0.1)
+		if not TransportSystem.lift_automatic(sim):
+			manual_ticks += 1
+		var lr: Dictionary = sim.rt["lift"]
+		seen[String(op["job"]) + (" resting" if op["resting"] else "")] = true
+		if phase == 1:
+			full_rate = maxf(full_rate, float(lr["moved_rate"]))
+			duty_rate = float(lr["rate"])
+		if op["resting"]:
+			relief_rate = maxf(relief_rate, float(lr["rate"]))
+			relief_moved += float(lr["moved_rate"]) * 0.1
+	assert_eq(manual_ticks, 0, "the lift never asks for LIFT while an operator is hired")
+	assert_true(seen.has("operate") and seen.has("idle") and seen.has("rest resting"),
+		"the operator wound, waited at the winder and took a break: %s" % str(seen.keys()))
+	assert_gt(full_rate, 0.0, "the lift runs with its operator")
+	assert_gt(relief_moved, 0.0, "the lift keeps running while the operator is on a break")
+	assert_rel(relief_rate, duty_rate * float(sim.content.bal("lift", "relief_pace", 0.5)), 0.05, "at the relief pace")
+
+
+## A sales manager on a break keeps sales automatic; a machine operator
+## waiting for ore keeps the machine at full speed for the next load.
+func test_breaks_and_waiting_keep_automation() -> void:
+	var sim := make_sim()
+	sim.state.money = 1e9
+	for q in ["q_first_swing", "q_first_lift", "q_first_sale", "q_first_miner", "q_mining_5", "q_lift_operator", "q_sell_goods"]:
+		sim.state.quests[q] = "claimed"
+	ProgressionSystem.refresh_quests(sim)
+	sim.state.techs["crushing"] = true
+	sim.invalidate_modifiers()
+	assert_ok(sim.execute({"type": "build", "facility": "crusher"}))
+	assert_ok(sim.execute({"type": "hire", "role": "supervisor", "post": "office"}))
+	assert_ok(sim.execute({"type": "hire", "role": "operator", "post": "crusher"}))
+	sim.advance(60.0, 0.1)
+	var boss: Dictionary = sim.workers_at("office", "supervisor")[0]
+	boss["energy"] = 0.01
+	var rested := false
+	var manual := 0
+	for i in 600:
+		sim.tick(0.1)
+		rested = rested or bool(boss["resting"])
+		if not SalesSystem.automatic(sim):
+			manual += 1
+	assert_true(rested, "the sales manager took a break")
+	assert_eq(manual, 0, "sales stay automatic through the break")
+	sim.state.surface_bin = {}
+	sim.advance(3.0, 0.1)
+	var crusher_op: Dictionary = sim.workers_at("crusher", "operator")[0]
+	assert_eq(String(crusher_op["job"]), "idle", "no ore: the crusher operator waits")
+	assert_near(ProcessingSystem.operator_factor(sim, "crusher"), 1.0, 1e-6, "a waiting operator still runs the crusher")
+
+
+## While ore flows the operators work - also when a lift that keeps up
+## with the miners empties the stations every step, and a belt that keeps
+## up empties the silo: they were shown waiting then, and a waiting
+## operator once left the lift to the player and the machine at 35 %.
+func test_operators_work_while_ore_flows() -> void:
+	var sim := make_sim()
+	sim.state.money = 1e9
+	for q in ["q_first_swing", "q_first_lift", "q_first_sale", "q_first_miner", "q_mining_5", "q_lift_operator", "q_sell_goods"]:
+		sim.state.quests[q] = "claimed"
+	ProgressionSystem.refresh_quests(sim)
+	sim.state.techs["crushing"] = true
+	sim.invalidate_modifiers()
+	assert_ok(sim.execute({"type": "build", "facility": "crusher"}))
+	assert_ok(sim.execute({"type": "upgrade", "facility": "conveyor", "count": 40}))
+	assert_ok(sim.execute({"type": "upgrade", "facility": "headframe", "count": 20}))
+	for k in 2:
+		assert_ok(sim.execute({"type": "hire", "role": "miner", "post": "depth:1"}))
+	assert_ok(sim.execute({"type": "hire", "role": "operator", "post": "headframe"}))
+	assert_ok(sim.execute({"type": "hire", "role": "operator", "post": "crusher"}))
+	sim.advance(90.0, 0.1)
+	var lift_op: Dictionary = sim.workers_at("headframe", "operator")[0]
+	var crusher_op: Dictionary = sim.workers_at("crusher", "operator")[0]
+	var seen := {"lift": [0, 0], "crusher": [0, 0]}
+	var empty_station := 0
+	for i in 1200:
+		sim.tick(0.1)
+		if TransportSystem.stations_total(sim) <= 0.01:
+			empty_station += 1
+		for pair in [["lift", lift_op], ["crusher", crusher_op]]:
+			var w: Dictionary = pair[1]
+			if not w["resting"]:
+				seen[pair[0]][0] += 1
+				if w["job"] == "operate":
+					seen[pair[0]][1] += 1
+	assert_gt(float(empty_station), 600.0, "the lift keeps up: the station is empty between steps (%d of 1200)" % empty_station)
+	assert_gt(float(sim.state.run_stats.get("lifted", 0.0)), 1.0, "ore flows")
+	for k in seen:
+		var on: Array = seen[k]
+		assert_gt(float(on[1]), 0.95 * float(on[0]), "the %s operator works while ore flows (%d of %d steps)" % [k, on[1], on[0]])
+
+
 func test_upgrades_increase_throughput() -> void:
 	var sim := make_sim()
 	sim.state.money = 1e9

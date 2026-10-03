@@ -26,7 +26,7 @@ static func output_item(sim: Simulation, res_id: String) -> String:
 
 
 static func operator_factor(sim: Simulation, fid: String) -> float:
-	if sim.crew(fid, "operator") > 0.0:
+	if sim.on_duty(fid, "operator") > 0.0:     # running the machine or ready for the next load
 		return 1.0
 	var fac := sim.content.facility(fid)
 	if sim.mods.has_flag("machines_self_run"):
@@ -51,7 +51,11 @@ static func conveyor_rate(sim: Simulation) -> float:
 		* UtilitySystem.power_factor(sim, "conveyor") * sim.boost_mult()
 
 
+## Ore for the machine waits in the silo or reached it on the last step (a
+## belt that keeps up empties the silo every step: the flow still counts).
 static func machine_has_work(sim: Simulation, fid: String) -> bool:
+	if float(sim.state.facilities.get(fid, {}).get("need", 0.0)) > 0.0:
+		return true
 	if Simulation.inv_total(sim.state.surface_bin) <= 0.01:
 		return false
 	for rid in sim.state.surface_bin:

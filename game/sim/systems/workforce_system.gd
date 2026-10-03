@@ -41,6 +41,7 @@ static func update_crews(sim: Simulation, dt: float = 0.0) -> void:
 	var crew := {}
 	var repair := {}
 	var posted := {}
+	var duty := {}
 	var t := sim.state.run_time
 	for w in sim.state.workers:
 		if w["resting"]:
@@ -51,9 +52,14 @@ static func update_crews(sim: Simulation, dt: float = 0.0) -> void:
 		if not posted.has(pp):
 			posted[pp] = {}
 		posted[pp][w["role"]] = float(posted[pp].get(w["role"], 0.0)) + efficiency(sim, w)
+		var arrive := float(w["arrive_at"])
+		# On duty: arrived, working or waiting for work (Simulation.on_duty).
+		if t >= arrive - 1e-6:
+			if not duty.has(pp):
+				duty[pp] = {}
+			duty[pp][w["role"]] = float(duty[pp].get(w["role"], 0.0)) + efficiency(sim, w)
 		if not String(w["job"]) in PRODUCTIVE:
 			continue
-		var arrive := float(w["arrive_at"])
 		var frac := 1.0
 		if t < arrive - 1e-6:
 			if dt <= 0.0:
@@ -71,6 +77,7 @@ static func update_crews(sim: Simulation, dt: float = 0.0) -> void:
 	sim.rt["crew"] = crew
 	sim.rt["repair_crew"] = repair
 	sim.rt["posted"] = posted
+	sim.rt["on_duty"] = duty
 
 
 static func tick(sim: Simulation, dt: float) -> void:

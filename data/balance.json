@@ -43,7 +43,8 @@
  "lift": {
   "load_s": 2.0,
   "unload_s": 2.0,
-  "manual_trips_max": 3
+  "manual_trips_max": 3,
+  "relief_pace": 0.5
  },
  "sales": {
   "manual_trips_max": 3

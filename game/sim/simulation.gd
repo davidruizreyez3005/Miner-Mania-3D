@@ -274,6 +274,14 @@ func crew(post: String, role_id: String) -> float:
 	return float(rt.get("crew", {}).get(post, {}).get(role_id, 0.0))
 
 
+## Workers of a role on duty at a post right now - working or waiting there
+## for work, not on a break or on their way (efficiency sum). Posts that run
+## by themselves with a worker (the lift, the machines) count these, so a
+## worker who simply has nothing to do never hands the post back.
+func on_duty(post: String, role_id: String) -> float:
+	return float(rt.get("on_duty", {}).get(post, {}).get(role_id, 0.0))
+
+
 func facility_built(fid: String) -> bool:
 	return bool(state.facilities.get(fid, {}).get("built", false))
 

@@ -382,6 +382,14 @@ func _refresh_crew(s: Simulation) -> void:
 			_crew_hire.set_cost(_crew_hire.title_label.text, c, s.state.money >= c)
 
 
+static func _lift_mode(s: Simulation, ls: Dictionary) -> String:
+	if not TransportSystem.lift_automatic(s):
+		return "Manual - tap LIFT"
+	if bool(ls.get("relief", false)):
+		return "Automatic - operator away, %d%% pace" % roundi(100.0 * float(s.content.bal("lift", "relief_pace", 0.5)))
+	return "Automatic"
+
+
 ## Rows (label, value) and an optional bar [value, max, variation] per facility.
 func _live_data(s: Simulation, fs: Dictionary) -> Dictionary:
 	var rows: Array = []
@@ -390,7 +398,7 @@ func _live_data(s: Simulation, fs: Dictionary) -> Dictionary:
 		"headframe":
 			var ls: Dictionary = s.rt.get("lift", TransportSystem.lift_stats(s))
 			rows = [["Lifting", Num.rate(float(ls.get("moved_rate", 0.0)))], ["Capacity", Num.rate(float(ls.get("rate", 0.0)))],
-				["Mode", "Automatic" if TransportSystem.lift_automatic(s) else "Manual - tap LIFT"]]
+				["Mode", _lift_mode(s, ls)]]
 		"silo":
 			var cap := Economy.bin_capacity(s)
 			var have := Simulation.inv_total(s.state.surface_bin)
